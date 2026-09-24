@@ -18,7 +18,7 @@ Start with your first real slice of functionality.
 
 Replace these examples with your own features:
 
-- [ ] 1. **Auth & roles** - customer register/login/logout with Sanctum SPA cookies, seeded admin account, admin vs customer middleware, role-based redirects and layouts
+- [x] 1. **Auth & roles** - separate `/admin` login (email + password, seeded accounts, no public signup) and customer auth (sign-up collects full profile info; v1 login is mobile-number-only with no password check, v2 adds an SMS one-time code); two admin tiers - super admin creates/enables/disables admin accounts and assigns each one per-module permissions (services, inventory, bookings, payments, dashboard), a regular admin is restricted to their assigned modules; Sanctum SPA cookies for both, role-based middleware and layouts
 - [ ] 2. **Customer profile** - customer views and edits name, email and phone (PH mobile format), and changes password
 - [ ] 3. **Services management** - admin creates, edits and deactivates roastable/sellable items with roasting rate per kg, shop price per piece, cook time and allowed booking types; public active-services endpoint
 - [ ] 4. **Inventory** - admin restocks and adjusts shop stock per piece inside locked transactions, with a full inventory log and low-stock indicator

@@ -297,7 +297,13 @@ Two-app layout: `backend/` (Laravel API) and `frontend/` (React + TypeScript SPA
 
 - Dev server: `php artisan serve` (http://localhost:8000)
 - Install deps: `composer install`
-- Test: `php artisan test` (PHPUnit, configured out of the box by the Laravel skeleton)
+- Test: `composer test` (PHPUnit; runs against a real local
+  `roasting_service_test` Postgres database, using the host/port/credentials
+  already in `.env`, per `phpunit.xml`. The target database must already exist
+  locally. Use `composer test`, not `php artisan test` directly: the composer
+  script clears the config cache first, which matters because
+  `phpunit.xml`'s forced `<env>`/`<server>` overrides have no effect once
+  config is cached.)
 - Code style: `vendor/bin/pint`
 
 ### Frontend (`frontend/`)
@@ -306,9 +312,7 @@ Two-app layout: `backend/` (Laravel API) and `frontend/` (React + TypeScript SPA
 - Build: `npm run build`
 - Preview production build: `npm run preview`
 - Lint: `npm run lint` (oxlint)
-
-The frontend has no unit test runner yet. Run `/tests` or `$tests` to add one and
-update this section with the real test commands.
+- Test: `npm run test` (Vitest); watch mode: `npm run test:watch`
 
 Browser testing is also opt-in. Run `/tests browser` or `$tests browser` to add
 or normalize a browser harness and document its exact command as `Browser

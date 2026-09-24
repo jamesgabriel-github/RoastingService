@@ -34,7 +34,8 @@ monitor sales.
 | User | Needs |
 |---|---|
 | **Customer** | Book a roasting service or order from the shop, choose pickup or delivery, see estimated/final price, track status |
-| **Admin (shop staff)** | Review and confirm bookings, weigh in raw food, update cooking status, manage services and inventory, add walk-ins, record payments, monitor sales |
+| **Admin (shop staff)** | Review and confirm bookings, weigh in raw food, update cooking status, manage services and inventory, add walk-ins, record payments, monitor sales - scoped to whichever modules they've been granted |
+| **Super admin (shop owner/manager)** | Everything a regular admin can do, plus create/enable/disable admin accounts and assign each one's per-module permissions |
 | **Visitor (public)** | Learn about the shop, services, prices and how booking works, then register |
 
 ## 3. Features - What does the MVP need?
@@ -108,6 +109,10 @@ Exits: Rejected / Cancelled -> stock released
 - **Payments:** record full payment at pickup/delivery (cash, GCash, etc.)
 - **Dashboard:** sales today/week/month, split by booking type; bookings by
   status; top items; today's queue; low stock
+- **Admin accounts (super admin only):** create admin accounts, enable/disable
+  them, and assign each one permissions per module - Services, Inventory,
+  Bookings, Payments, Dashboard. An admin without a module's permission can't
+  reach that module's pages or endpoints at all.
 
 ### Business rules
 
@@ -119,6 +124,23 @@ Exits: Rejected / Cancelled -> stock released
 5. No shipping fee for now (field kept, default 0).
 6. Rates are snapshotted on each booking item so price changes don't alter
    history.
+7. Admin login is separate from customer login (its own page/route) and uses
+   a normal per-admin identity - email + password - so audit fields
+   (`approved_by`, `confirmed_by`, `created_by`, `recorded_by`, `changed_by`)
+   attribute to a real admin. No public admin signup; admin accounts are
+   created by seeder/by another admin, same as before.
+8. Customer login is by **mobile number only** in v1 - no password, no code,
+   just the registered number. This is a deliberate v1 simplification, not an
+   oversight: it means anyone who knows a customer's registered mobile number
+   can access that account until v2's SMS verification ships. Customer
+   sign-up still collects full personal information (name, email, phone) as
+   before; only the login step is simplified.
+9. Two admin tiers: **super admin** and **admin**. Only a super admin can
+   create, enable/disable, or change the permissions of an admin account.
+   A disabled admin account can't log in even with correct credentials. A
+   regular admin can only reach the modules (Services, Inventory, Bookings,
+   Payments, Dashboard) they've been explicitly granted; super admin always
+   has every permission and doesn't need them assigned.
 
 ### Not in v1
 
@@ -128,11 +150,34 @@ Exits: Rejected / Cancelled -> stock released
 - SMS/email notifications
 - Roaster capacity / time-slot checking
 - Public "track by code" page, reports export, mobile app
+- Customer login verification: after entering their mobile number, send a
+  one-time SMS code (e.g. via Semaphore) to that number and require it before
+  granting access, closing the v1 gap in rule 8
 
 ## 4. Data - What are we storing?
 
 ### `users`
-id, name, email, phone, password, role (`admin` | `customer`), timestamps
+id, name, email, phone, password, role (`super_admin` | `admin` | `customer`),
+is_active (default true), timestamps
+
+### `admin_permissions`
+id, user_id (-> `users`, an `admin` row), module (`services` | `inventory` |
+`bookings` | `payments` | `dashboard`), granted_by (-> `users`, the super
+admin who granted it), timestamps
+
+> Admin rows (`role = admin` or `super_admin`) log in with email + password on
+> a separate `/admin` page/route; no public admin signup - only a super admin
+> creates other admin accounts. `is_active = false` blocks login outright even
+> with correct credentials. A `super_admin` row needs no `admin_permissions`
+> rows (always full access); an `admin` row can only reach the modules it has
+> a row for. `approved_by`, `confirmed_by`, `created_by`, `recorded_by`, and
+> `changed_by` below are normal `users.id` FKs pointing at the acting admin.
+>
+> Customer rows (`role = customer`) log in with **mobile number only** in v1
+> - `password` is collected at sign-up but not checked at login yet. v2 adds
+> an SMS one-time code sent to that number (see Not in v1); whether that code
+> lives in a new table or an ephemeral cache entry is a `/feature`-time
+> implementation decision, not fixed here.
 
 ### `services`
 id, name, description, roasting_rate_per_kg (nullable), shop_price (nullable,
@@ -185,7 +230,20 @@ key, value - e.g. `downpayment_enabled` (false), `downpayment_percent` (25)
   API on the same top-level domain, e.g. `app.example.com` +
   `api.example.com`; set `SANCTUM_STATEFUL_DOMAINS`, `SESSION_DOMAIN` and CORS
   `supports_credentials`). Use API tokens later for mobile/desktop clients.
-- **Roles:** `role` column + middleware/policies for admin vs customer routes.
+- **Admin login** is a separate `/admin` page/route from customer login, but
+  still a normal email + password check against a `users` row (`role =
+  admin` or `super_admin`); no public admin signup, only a super admin
+  creates other admin accounts. `is_active = false` blocks login outright.
+- **Customer login** in v1 only asks for a mobile number - no password check.
+  v2 adds SMS one-time-code verification to that number (e.g. via Semaphore)
+  before granting the session; sign-up still collects full customer details
+  regardless of the login method.
+- **Roles & permissions:** `role` column (`super_admin` | `admin` |
+  `customer`) plus middleware/policies for admin vs customer routes. Within
+  admin, per-module access (Services, Inventory, Bookings, Payments,
+  Dashboard) is checked against `admin_permissions`; a policy/gate per module
+  is the natural place for this in Laravel, keeping it out of individual
+  controllers.
 - **Status changes** go through one service/action class that validates
   allowed transitions and writes `booking_status_logs`, so the rules live in
   one place.
@@ -200,10 +258,9 @@ key, value - e.g. `downpayment_enabled` (false), `downpayment_percent` (25)
   jobs; Stripe behind a payment interface so PayMongo/Xendit can be swapped
   in (confirm Stripe availability for a PH business first).
 
-> Current actual state (per `/onboard`): backend is still the stock
-> `laravel/laravel` skeleton on SQLite with no Sanctum installed yet; frontend
-> has no router or data-fetching library installed yet. These land as their
-> own build-plan features, not assumed to already exist.
+> Current actual state (per Feature 1): Sanctum, PostgreSQL, and the
+> frontend's router/data-fetching/form libraries are all wired in. Later
+> features can assume this baseline exists.
 
 ## 6. Monetize - How will this make money?
 

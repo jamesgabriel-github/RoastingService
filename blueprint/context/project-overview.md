@@ -1,6 +1,6 @@
 # Roasting Service - Project Overview
 
-<!-- blueprint:source-hash 1d19bab8a0a934f112bee08b38c96299aae516a9a4b7a1cc43011aaf93540d76 -->
+<!-- blueprint:source-hash eefcef26c31dd906bcb83dd56606d710ece6e8ed837441ac7d01dd6602ee950d -->
 
 > A booking and inventory system for a roasting shop: customers book roasting
 > for their own raw food or order roasted items from shop stock, and admins run
@@ -19,10 +19,14 @@ record.
 ## Users
 
 - **Customer** - books a roasting service or a shop order, chooses pickup or
-  delivery, sees estimated vs final price, tracks status.
-- **Admin (shop staff)** - reviews/confirms bookings, weighs in raw food,
-  updates cooking status, manages services and inventory, adds walk-ins,
-  records payments, monitors sales.
+  delivery, sees estimated vs final price, tracks status. Signs up with full
+  profile info; logs in with mobile number only in v1 (see Open questions).
+- **Admin** - reviews/confirms bookings, weighs in raw food, updates cooking
+  status, manages services and inventory, adds walk-ins, records payments,
+  monitors sales - scoped to whichever modules a super admin has granted.
+- **Super admin** (shop owner/manager) - everything an admin can do, plus
+  creates/enables/disables admin accounts and assigns their per-module
+  permissions. Always has full access.
 - **Visitor (public, anonymous)** - browses services, prices, and how booking
   works, then registers.
 
@@ -32,7 +36,7 @@ Headline feature: **Bring-your-own booking** (5) plus its shared booking-status
 engine - this is the core of the product and everything downstream (queues,
 weigh-in, cooking, payments, dashboard) is built on it.
 
-1. **Auth & roles** - customer register/login/logout via Sanctum SPA cookies, seeded admin account, role-based middleware/layouts.
+1. **Auth & roles** - separate `/admin` login (email + password, seeded accounts) and customer auth (full sign-up; v1 login is mobile-number-only, v2 adds SMS one-time code); two admin tiers where super admin manages admin accounts and per-module permissions.
 2. **Customer profile** - view/edit name, email, phone; change password.
 3. **Services management** - admin CRUD for roastable/sellable items (rate, price, cook time, allowed booking types, active toggle); public active-services list.
 4. **Inventory** - admin restock/adjust per-piece stock inside locked transactions, full log, low-stock indicator.
@@ -52,7 +56,16 @@ weigh-in, cooking, payments, dashboard) is built on it.
 
 ### `users`
 - `id`, `name`, `email`, `phone`, `password`
-- `role` (enum: `admin` | `customer`)
+- `role` (enum: `super_admin` | `admin` | `customer`)
+- `is_active` (bool, default true) - `false` blocks login outright, even with correct credentials (used to disable admins)
+
+### `admin_permissions`
+- `id`, `user_id` -> `users` (an `admin` row)
+- `module` (enum: `services` | `inventory` | `bookings` | `payments` | `dashboard`)
+- `granted_by` -> `users` (the super admin who granted it)
+
+> A `super_admin` needs no rows here (always full access). An `admin` can only
+> reach the modules it has a row for.
 
 ### `services`
 - `id`, `name`, `description`
@@ -95,7 +108,8 @@ weigh-in, cooking, payments, dashboard) is built on it.
 
 > Lock: rates/prices are snapshotted onto `booking_items` at booking time so
 > later price changes never rewrite history. Money and weight columns are
-> `numeric`, never float.
+> `numeric`, never float. `approved_by`/`confirmed_by`/`created_by`/
+> `recorded_by`/`changed_by` are all real `users.id` FKs to the acting admin.
 
 **Status flows** (`bookings.status`):
 - Customer-supplied: `Booked -> Pending review -> Approved -> Confirmed -> Cooking -> Ready|Out for delivery -> Completed`, with exits to `Rejected`, `No-show`, `Cancelled` (only before Cooking).
@@ -105,15 +119,20 @@ weigh-in, cooking, payments, dashboard) is built on it.
 
 - **Laravel** - REST API backend, one JSON API under `/api/v1` once routes exist.
 - **React + TypeScript + Tailwind + shadcn/ui** - the SPA frontend.
-- **Laravel Sanctum** - SPA cookie-based auth (frontend + API on sibling subdomains); API tokens later for mobile/desktop.
+- **Laravel Sanctum** - SPA cookie-based sessions for both admin and customer once authenticated.
 - **PostgreSQL** - `numeric` for money/weight, enums/check constraints for statuses.
 - TanStack Query + Zod (frontend data-fetching/validation) - planned, not yet installed.
 
+Auth specifics:
+- Admin: separate `/admin` login, email + password against a `users` row (`admin`/`super_admin`), no public signup, `is_active` gate.
+- Customer: v1 login is mobile-number-only, no password check; v2 adds an SMS one-time code (e.g. Semaphore).
+- Admin authorization: `role` distinguishes the three tiers; per-module access for `admin` rows is checked against `admin_permissions` (a policy/gate per module, not inline in controllers).
+
 > TODO / current gap: the scaffolded backend is still stock `laravel/laravel`
 > on SQLite with no Sanctum installed, and the frontend has no router or
-> data-fetching library yet. Feature 1 (Auth & roles) is where Sanctum and the
-> real database driver actually get wired in - don't assume they're already in
-> place.
+> data-fetching library yet. Feature 1 (Auth & roles) is where all of this -
+> Sanctum, the real database driver, the permissions model - actually gets
+> built; don't assume any of it is already in place.
 
 ## Monetization
 
@@ -129,9 +148,9 @@ everywhere; toasts on every action; confirmation dialogs for reject/cancel/delet
 Currency as PHP (Peso) with two decimals; weights in kg with up to two decimals.
 
 Main screens (exact route paths not yet decided):
-- Public: landing/hero, services list, how-it-works, location/contact, login/register.
+- Public: landing/hero, services list, how-it-works, location/contact, customer login/register.
 - Customer: new-booking step flow (type -> items -> pickup/delivery -> review), my-bookings list + detail (status timeline), profile.
-- Admin: tabbed booking queues, booking detail, services table, inventory log, walk-in form, payments list, sales dashboard.
+- Admin: separate `/admin` login, tabbed booking queues, booking detail, services table, inventory log, walk-in form, payments list, sales dashboard, admin-account management (super admin only).
 
 ## Deployment
 
@@ -142,14 +161,21 @@ Main screens (exact route paths not yet decided):
 
 ## Open questions
 
+- **Customer password field's purpose is unclear.** Feature 2 (Customer
+  profile) includes "change password," but business rule 8 says v1 customer
+  login never checks a password (mobile number only). Confirm whether
+  password-change stays in Feature 2's v1 scope even though it does nothing
+  for login yet, or should wait until v2's real customer auth exists.
 - **Monetization and Deployment weren't in the original project-plan draft.**
-  I've filled Monetization as N/A (internal shop tool) and left Deployment as
-  an open TODO - confirm these are right rather than gaps I should chase down.
+  Monetization is filled as N/A (internal shop tool); Deployment is an open
+  TODO - confirm these are right rather than gaps to chase down.
 - **Tech stack vs. current code:** the plan targets PostgreSQL + Sanctum, but
   the scaffolded backend is still SQLite with no Sanctum installed. Feature 1
-  (Auth & roles) needs to cover that migration as part of its scope, not treat
-  it as already done.
+  needs to cover that migration as part of its scope.
 - **`settings` table's only documented use** (`downpayment_enabled/percent`)
-  backs the downpayment feature, which is explicitly out of v1. Worth
-  confirming whether `settings` ships in v1 at all, or waits until downpayment
-  is built.
+  backs the downpayment feature, which is explicitly out of v1. Confirm
+  whether `settings` ships in v1 at all, or waits until downpayment is built.
+- **Feature 1 has grown large** (customer auth + admin auth + two-tier admin
+  roles + per-module permissions). Not a plan defect - this was a deliberate
+  choice to keep it as one feature - but worth knowing before `/feature 1`
+  writes the spec, since it may want a step-heavy implementation.

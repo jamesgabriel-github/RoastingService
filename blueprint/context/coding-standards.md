@@ -23,10 +23,8 @@ TypeScript SPA. Standards below are split accordingly.
   `float`
 - Code style: `vendor/bin/pint`
 
-> TODO: no API routes, Sanctum auth, or non-default database driver exist yet -
-> the backend is still the stock `laravel/laravel` skeleton on SQLite. The
-> project plan calls for Sanctum + PostgreSQL; that lands as its own build-plan
-> feature, not an onboarding change.
+Sanctum SPA cookie auth, `/api/v1` routes, and PostgreSQL are wired in as of
+Feature 1 (Auth & roles).
 
 ## Frontend: TypeScript / React
 
@@ -80,18 +78,13 @@ TypeScript SPA. Standards below are split accordingly.
   in sync
 - Seeders and factories belong under `backend/database/seeders` and
   `backend/database/factories`
-
-> TODO: still SQLite (Laravel skeleton default). Confirm/switch to PostgreSQL
-> when the database driver is actually configured.
+- Database driver is PostgreSQL (as of Feature 1)
 
 ## Data Fetching
 
-- Backend: Eloquent in controllers/services, one JSON API under a versioned
-  prefix once routes exist (see `roastingservice-build-plan.md`, `/api/v1`)
+- Backend: Eloquent in controllers/services, one JSON API under `/api/v1`
 - Backend: validate all inputs with Form Requests
-- Frontend: no HTTP client is installed yet - add one deliberately (the plan
-  calls for axios/TanStack Query) as its own build-plan step, not a silent
-  mid-feature install
+- Frontend: axios (via `src/lib/api.ts`) + TanStack Query, as of Feature 1
 
 ## Error Handling
 
@@ -108,12 +101,9 @@ The backend already ships a working test runner: PHPUnit via `php artisan test`
 `AGENTS.md`, so per the opt-in rule below, tests are already a gate for
 logic-bearing backend steps.
 
-The frontend has no test runner yet; that's opt-in at the project level until
-someone adds one. Adding unit testing is an explicit setup task the AI can do
-through the normal workflow, either as a build-plan item or with `/tests`. The
-setup should choose the stack-native runner (Vitest), wire the scripts or
-commands, add a small example test, and update the Commands section of
-`AGENTS.md`.
+The frontend uses Vitest (`npm run test`, `npm run test:watch`), set up via
+`/tests`. Frontend logic-bearing steps are gated by it the same way backend
+steps are gated by PHPUnit, per the opt-in rule below.
 
 When `AGENTS.md` declares a `Verify` command, treat it as the umbrella automated
 gate. It combines only the checks this project actually has, in this order when
@@ -152,8 +142,8 @@ of the switch; the skills and `ai-interaction.md` only point back here.
   hardcoded tool name.
 
 Stack binding: the backend uses PHPUnit (`php artisan test`) with Laravel's
-`RefreshDatabase`/factories for setup; the frontend will use Vitest once
-adopted, with `vi.mock()` for external calls and `vi.useFakeTimers()` for
+`RefreshDatabase`/factories for setup; the frontend uses Vitest (`npm run
+test`), with `vi.mock()` for external calls and `vi.useFakeTimers()` for
 time-dependent logic.
 
 ## Browser Verification
