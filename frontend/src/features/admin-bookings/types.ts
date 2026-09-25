@@ -49,6 +49,8 @@ export interface AdminBooking {
   customer_phone: string | null
   estimated_total: string
   total_amount: string | null
+  paid_amount: string
+  balance: string | null
   preferred_dropoff_at: string | null
   dropoff_at: string | null
   approved_at: string | null

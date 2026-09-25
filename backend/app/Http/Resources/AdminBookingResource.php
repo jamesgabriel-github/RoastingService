@@ -18,6 +18,10 @@ class AdminBookingResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $paidAmount = $this->relationLoaded('payments')
+            ? number_format((float) $this->payments->where('status', 'paid')->sum('amount'), 2, '.', '')
+            : '0.00';
+
         return [
             'id' => $this->id,
             'code' => $this->code,
@@ -31,6 +35,8 @@ class AdminBookingResource extends JsonResource
             'customer_phone' => $this->customer?->phone ?? $this->guest_phone,
             'estimated_total' => $this->estimated_total,
             'total_amount' => $this->total_amount,
+            'paid_amount' => $paidAmount,
+            'balance' => $this->total_amount === null ? null : number_format((float) $this->total_amount - (float) $paidAmount, 2, '.', ''),
             'preferred_dropoff_at' => $this->preferred_dropoff_at,
             'dropoff_at' => $this->dropoff_at,
             'approved_at' => $this->approved_at,

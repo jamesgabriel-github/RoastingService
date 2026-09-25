@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ApprovePayload, RejectPayload, RemarksPayload, WalkInRoastingPayload, WalkInShopPayload, WeighInPayload } from './api'
+import type {
+  ApprovePayload,
+  RecordPaymentPayload,
+  RejectPayload,
+  RemarksPayload,
+  WalkInRoastingPayload,
+  WalkInShopPayload,
+  WeighInPayload,
+} from './api'
 import {
   approveBooking,
   cancelBooking,
@@ -13,6 +21,7 @@ import {
   markOutForDelivery,
   markReady,
   noShowBooking,
+  recordPayment,
   rejectBooking,
   rejectOrder,
   searchWalkInCustomers,
@@ -147,6 +156,15 @@ export function useCancelBooking() {
 
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: RemarksPayload }) => cancelBooking(id, payload),
+    onSuccess: (_data, { id }) => invalidate(id),
+  })
+}
+
+export function useRecordPayment() {
+  const invalidate = useBookingActionInvalidation()
+
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: RecordPaymentPayload }) => recordPayment(id, payload),
     onSuccess: (_data, { id }) => invalidate(id),
   })
 }

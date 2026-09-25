@@ -4,8 +4,10 @@ import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useMe } from '@/features/auth/hooks'
 import { formatCurrency } from '@/lib/currency'
 import { getGenericErrorMessage } from '@/lib/errors'
+import type { RecordPaymentPayload } from './api'
 import {
   useAdminBookingDetail,
   useApproveBooking,
@@ -15,6 +17,7 @@ import {
   useMarkOutForDelivery,
   useMarkReady,
   useNoShowBooking,
+  useRecordPayment,
   useRejectBooking,
   useRejectOrder,
   useStartCooking,
@@ -22,6 +25,8 @@ import {
 } from './hooks'
 import type { AdminBooking } from './types'
 import { isAdminCancellable } from './types'
+
+const PAYMENT_ELIGIBLE_STATUSES = ['confirmed', 'cooking', 'ready', 'out_for_delivery', 'completed']
 
 function getActionErrorMessage(error: unknown): string {
   if (isAxiosError(error) && error.response?.status === 422) {
@@ -323,10 +328,60 @@ function CancelAction({ booking }: { booking: AdminBooking }) {
   )
 }
 
+function RecordPaymentActions({ booking }: { booking: AdminBooking }) {
+  const [method, setMethod] = useState<RecordPaymentPayload['method']>('cash')
+  const [referenceNo, setReferenceNo] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const recordPayment = useRecordPayment()
+
+  const onRecordPayment = () => {
+    setError(null)
+    recordPayment.mutate(
+      { id: booking.id, payload: { method, reference_no: referenceNo.trim() || null } },
+      { onError: (err) => setError(getActionErrorMessage(err)) }
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3">
+      <h2 className="font-semibold">Record payment</h2>
+
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="payment_method">Method</Label>
+        <select
+          id="payment_method"
+          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base outline-none md:text-sm"
+          value={method}
+          onChange={(event) => setMethod(event.target.value as RecordPaymentPayload['method'])}
+        >
+          <option value="cash">Cash</option>
+          <option value="gcash">GCash</option>
+          <option value="card">Card</option>
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="payment_reference_no">Reference number (optional)</Label>
+        <Input
+          id="payment_reference_no"
+          value={referenceNo}
+          onChange={(event) => setReferenceNo(event.target.value)}
+        />
+      </div>
+
+      <Button disabled={recordPayment.isPending} onClick={onRecordPayment}>
+        Record payment
+      </Button>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  )
+}
+
 export function AdminBookingDetailPage() {
   const params = useParams<{ id: string }>()
   const id = Number(params.id)
   const { data: booking, isLoading } = useAdminBookingDetail(id)
+  const { data: me } = useMe()
 
   if (isLoading) {
     return <p>Loading…</p>
@@ -337,6 +392,10 @@ export function AdminBookingDetailPage() {
   }
 
   const isRoasting = booking.source_type === 'customer_supplied'
+  const canRecordPayment =
+    PAYMENT_ELIGIBLE_STATUSES.includes(booking.status) &&
+    Number(booking.balance) > 0 &&
+    (me?.role === 'super_admin' || me?.permissions.includes('payments'))
 
   return (
     <div className="flex max-w-lg flex-col gap-6">
@@ -425,7 +484,19 @@ export function AdminBookingDetailPage() {
             Final total: <span className="font-semibold">{formatCurrency(booking.total_amount)}</span>
           </p>
         )}
+        {booking.total_amount && (
+          <>
+            <p>
+              Paid: <span className="font-semibold">{formatCurrency(booking.paid_amount)}</span>
+            </p>
+            <p>
+              Balance: <span className="font-semibold">{formatCurrency(booking.balance ?? 0)}</span>
+            </p>
+          </>
+        )}
       </div>
+
+      {canRecordPayment && <RecordPaymentActions booking={booking} />}
     </div>
   )
 }

@@ -404,7 +404,7 @@ class BookingController extends Controller
     /**
      * @return array<int|string, string|\Closure>
      */
-    private static function detailEagerLoads(): array
+    public static function detailEagerLoads(): array
     {
         return [
             'items.service',
@@ -413,6 +413,7 @@ class BookingController extends Controller
             'statusLogs' => fn ($query) => $query->orderBy('id')->with('changer'),
             'approver',
             'confirmer',
+            'payments',
         ];
     }
 }

@@ -10,6 +10,7 @@ import { AdminAccountsPage } from '@/features/admin-accounts/AdminAccountsPage'
 import { AdminBookingDetailPage } from '@/features/admin-bookings/AdminBookingDetailPage'
 import { AdminBookingsPage } from '@/features/admin-bookings/AdminBookingsPage'
 import { WalkInBookingPage } from '@/features/admin-bookings/WalkInBookingPage'
+import { PaymentsListPage } from '@/features/admin-payments/PaymentsListPage'
 import { BookingDetailPage } from '@/features/bookings/BookingDetailPage'
 import { BookingTypePage } from '@/features/bookings/BookingTypePage'
 import { MyBookingsPage } from '@/features/bookings/MyBookingsPage'
@@ -68,6 +69,10 @@ function App() {
             <Route path="/admin/bookings" element={<AdminBookingsPage />} />
             <Route path="/admin/bookings/walk-in" element={<WalkInBookingPage />} />
             <Route path="/admin/bookings/:id" element={<AdminBookingDetailPage />} />
+          </Route>
+
+          <Route element={<RoleRoute allow={['admin', 'super_admin']} requireModule="payments" />}>
+            <Route path="/admin/payments" element={<PaymentsListPage />} />
           </Route>
         </Route>
       </Route>

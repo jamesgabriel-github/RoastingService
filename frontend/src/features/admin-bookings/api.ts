@@ -24,6 +24,11 @@ export interface RemarksPayload {
   remarks?: string
 }
 
+export interface RecordPaymentPayload {
+  method: 'cash' | 'gcash' | 'card'
+  reference_no?: string | null
+}
+
 export async function fetchBookingCounts(): Promise<BookingCounts> {
   const { data } = await api.get<BookingCounts>('/admin/bookings/counts')
   return data
@@ -108,6 +113,12 @@ export async function noShowBooking(id: number, payload: RemarksPayload): Promis
 export async function cancelBooking(id: number, payload: RemarksPayload): Promise<AdminBooking> {
   await ensureCsrfCookie()
   const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/cancel`, payload)
+  return data
+}
+
+export async function recordPayment(id: number, payload: RecordPaymentPayload): Promise<AdminBooking> {
+  await ensureCsrfCookie()
+  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/payments`, payload)
   return data
 }
 
