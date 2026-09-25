@@ -7,6 +7,8 @@ import { AdminLoginPage } from '@/features/auth/AdminLoginPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ProfileSetupPage } from '@/features/auth/ProfileSetupPage'
 import { AdminAccountsPage } from '@/features/admin-accounts/AdminAccountsPage'
+import { AdminBookingDetailPage } from '@/features/admin-bookings/AdminBookingDetailPage'
+import { AdminBookingsPage } from '@/features/admin-bookings/AdminBookingsPage'
 import { BookingDetailPage } from '@/features/bookings/BookingDetailPage'
 import { BookingTypePage } from '@/features/bookings/BookingTypePage'
 import { MyBookingsPage } from '@/features/bookings/MyBookingsPage'
@@ -59,6 +61,11 @@ function App() {
 
           <Route element={<RoleRoute allow={['admin', 'super_admin']} requireModule="inventory" />}>
             <Route path="/admin/inventory" element={<InventoryPage />} />
+          </Route>
+
+          <Route element={<RoleRoute allow={['admin', 'super_admin']} requireModule="bookings" />}>
+            <Route path="/admin/bookings" element={<AdminBookingsPage />} />
+            <Route path="/admin/bookings/:id" element={<AdminBookingDetailPage />} />
           </Route>
         </Route>
       </Route>

@@ -21,6 +21,9 @@ export function AdminLayout() {
           {(me?.role === 'super_admin' || me?.permissions.includes('inventory')) && (
             <Link to="/admin/inventory">Inventory</Link>
           )}
+          {(me?.role === 'super_admin' || me?.permissions.includes('bookings')) && (
+            <Link to="/admin/bookings">Bookings</Link>
+          )}
         </div>
         <Button
           size="sm"

@@ -166,3 +166,19 @@
 **Why it matters:** Both pages read only `data`/`isLoading`. If `GET /bookings` fails, the list page shows only its heading with no message. On the detail page, a 5xx or network failure ends in "Booking not found.", which is misleading. The shared `QueryClient` also uses the default of 3 retries (`lib/queryClient.ts`), so a real 404 shows "Loading…" for several seconds before that message. The coding standards say to surface errors rather than fail silently. This repeats F-34/F-36 on the new pages.
 **Suggested fix:** Destructure `isError`/`error` and render `getGenericErrorMessage(error)`. Show "Booking not found." only for an Axios 404, and consider `retry: false` for 404s on the detail query. Current requirement lost: None.
 **Resolution:**
+
+### F-44 [P3] open - Admin booking queue and detail pages do not surface query errors
+
+**File:** frontend/src/features/admin-bookings/AdminBookingsPage.tsx:15-16; frontend/src/features/admin-bookings/AdminBookingDetailPage.tsx:8-15
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: quality)
+**Why it matters:** The pages read only `data`/`isLoading`. If the counts query fails, every tab shows `(0)`, which looks like an empty shop. If the list query fails, the page shows no table and no message. On the detail page, a 403, 5xx, or network failure shows "Booking not found." The coding standards say to surface errors rather than fail silently. This repeats F-41 on the new admin pages.
+**Suggested fix:** Destructure `isError`/`error` from each hook and render `getGenericErrorMessage(error)`. Show "Booking not found." only for an Axios 404. Current requirement lost: None.
+**Resolution:** Re-examined 2026-09-25 by /audit independent (re-review of `d261bb0`; scope: current; all lenses). `d261bb0` did not touch the frontend; `AdminBookingsPage.tsx:15-16` and `AdminBookingDetailPage.tsx:8-15` still read only `data`/`isLoading`. Also, a non-numeric URL such as `/admin/bookings/abc` becomes `Number('abc')` = `NaN`, requests `/admin/bookings/NaN`, retries the 404 with the default policy, then shows "Booking not found."; the same repair covers it. Still open.
+
+### F-46 [P3] open - No test covers the guest-contact fallback or the waiting-time created_at fallback
+
+**File:** backend/tests/Feature/Admin/AdminBookingQueuesTest.php:66; backend/app/Http/Resources/AdminBookingResource.php:28-31,36
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: tests)
+**Why it matters:** The spec's Notes for the AI require `customer_name`/`customer_phone` to fall back to `guest_name`/`guest_phone` now, before feature 13 creates guest bookings, and the spec lists guest name and guest phone among the `search` fields. No test creates a booking with `customer_id` null and guest fields, so the resource fallback and the `guest_name`/`guest_phone` search clauses (`BookingController.php:53-54`) are unexercised. Every test booking with a status log also has one, so `waiting_minutes`' fallback to `created_at` is untested. `test_counts_reflect_seeded_bookings_per_status` uses `assertJson` (a subset match) and seeds no terminal-status bookings, so it would not catch a `completed` key or count leaking into the response. The code reads correctly, so this is a coverage gap, not a known defect; feature 13 will rely on these paths.
+**Suggested fix:** Add a guest booking (`customer_id` null, `guest_name`/`guest_phone` set) and assert its `customer_name`/`customer_phone` in the list and that `search` matches by guest name and by guest phone. Add a booking with no status log and assert `waiting_minutes` reflects `created_at`. In the counts test, seed one `completed` booking and use `assertExactJson`. Current requirement lost: None.
+**Resolution:**

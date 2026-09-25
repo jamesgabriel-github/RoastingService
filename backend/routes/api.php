@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Admin\AdminAccountController;
 use App\Http\Controllers\Api\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Api\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Api\Admin\InventoryController as AdminInventoryController;
 use App\Http\Controllers\Api\Admin\ServiceController as AdminServiceController;
 use App\Http\Controllers\Api\Customer\AuthController as CustomerAuthController;
@@ -35,6 +36,12 @@ Route::prefix('v1')->group(function () {
             Route::get('/inventory/logs', [AdminInventoryController::class, 'logs']);
             Route::post('/inventory/{service}/restock', [AdminInventoryController::class, 'restock']);
             Route::post('/inventory/{service}/adjust', [AdminInventoryController::class, 'adjust']);
+        });
+
+        Route::middleware(['auth:sanctum', 'role:admin,super_admin', 'module:bookings'])->group(function () {
+            Route::get('/bookings/counts', [AdminBookingController::class, 'counts']);
+            Route::get('/bookings', [AdminBookingController::class, 'index']);
+            Route::get('/bookings/{id}', [AdminBookingController::class, 'show'])->where('id', '[0-9]{1,18}');
         });
     });
 

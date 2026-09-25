@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'code',
@@ -97,5 +98,13 @@ class Booking extends Model
     public function statusLogs(): HasMany
     {
         return $this->hasMany(BookingStatusLog::class);
+    }
+
+    /**
+     * @return HasOne<BookingStatusLog, $this>
+     */
+    public function latestStatusLog(): HasOne
+    {
+        return $this->hasOne(BookingStatusLog::class)->latestOfMany();
     }
 }

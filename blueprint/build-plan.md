@@ -26,7 +26,7 @@ Replace these examples with your own features:
 - [x] 6. **Bring-your-own booking** - customer books roasting for their own raw food (estimated raw kg, preferred drop-off, pickup/delivery) and sees a server-calculated estimate; introduces the booking status engine, rate snapshots and status logs
 - [x] 7. **Shop order** - customer orders in-stock items per piece with pickup/delivery; stock is reserved atomically with the order and the total is final
 - [x] 8. **My bookings** - customer list and detail with status timeline, estimated vs final weight and price, auto-refresh, and cancel before cooking
-- [ ] 9. **Admin booking queues** - tabbed status queues with counts, search by code/name/phone, waiting time, and a booking detail view
+- [x] 9. **Admin booking queues** - tabbed status queues with counts, search by code/name/phone, waiting time, and a booking detail view
 - [ ] 10. **Approve & weigh-in** - admin approves bring-your-own bookings with a drop-off schedule or rejects with a reason, then weighs in the raw food to lock the final price and confirm
 - [ ] 11. **Shop order confirmation** - admin confirms shop orders as final or rejects them with a reason, releasing reserved stock
 - [ ] 12. **Cooking & fulfillment** - admin starts cooking (sets estimated ready time), marks ready for pickup or out for delivery, completes, and handles no-shows and cancellations with stock release
