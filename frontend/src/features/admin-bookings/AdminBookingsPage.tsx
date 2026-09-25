@@ -22,7 +22,12 @@ export function AdminBookingsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Bookings</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Bookings</h1>
+        <Link to="/admin/bookings/walk-in" className="text-primary underline-offset-4 hover:underline">
+          New walk-in
+        </Link>
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {QUEUE_TABS.map((tab) => (

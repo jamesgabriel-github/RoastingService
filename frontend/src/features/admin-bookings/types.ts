@@ -67,6 +67,18 @@ export interface AdminBooking {
   created_at: string
 }
 
+export interface WalkInCustomer {
+  id: number
+  name: string
+  phone: string
+}
+
+export interface WalkInGuestOrCustomer {
+  customer_id: number | null
+  guest_name: string | null
+  guest_phone: string | null
+}
+
 export interface PaginatedAdminBookings {
   data: AdminBooking[]
   meta: {

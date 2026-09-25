@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ApprovePayload, RejectPayload, RemarksPayload, WeighInPayload } from './api'
+import type { ApprovePayload, RejectPayload, RemarksPayload, WalkInRoastingPayload, WalkInShopPayload, WeighInPayload } from './api'
 import {
   approveBooking,
   cancelBooking,
   completeBooking,
   confirmOrder,
+  createWalkInRoastingBooking,
+  createWalkInShopOrder,
   fetchAdminBookingDetail,
   fetchAdminBookings,
   fetchBookingCounts,
@@ -13,6 +15,7 @@ import {
   noShowBooking,
   rejectBooking,
   rejectOrder,
+  searchWalkInCustomers,
   startCooking,
   weighInBooking,
 } from './api'
@@ -145,5 +148,31 @@ export function useCancelBooking() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: RemarksPayload }) => cancelBooking(id, payload),
     onSuccess: (_data, { id }) => invalidate(id),
+  })
+}
+
+export function useSearchWalkInCustomers(search: string) {
+  return useQuery({
+    queryKey: ['walk-in-customers', search],
+    queryFn: () => searchWalkInCustomers(search),
+    enabled: search.trim().length >= 2,
+  })
+}
+
+export function useCreateWalkInRoastingBooking() {
+  const invalidate = useBookingActionInvalidation()
+
+  return useMutation({
+    mutationFn: (payload: WalkInRoastingPayload) => createWalkInRoastingBooking(payload),
+    onSuccess: (booking) => invalidate(booking.id),
+  })
+}
+
+export function useCreateWalkInShopOrder() {
+  const invalidate = useBookingActionInvalidation()
+
+  return useMutation({
+    mutationFn: (payload: WalkInShopPayload) => createWalkInShopOrder(payload),
+    onSuccess: (booking) => invalidate(booking.id),
   })
 }

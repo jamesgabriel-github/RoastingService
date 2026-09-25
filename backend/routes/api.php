@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Api\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Api\Admin\InventoryController as AdminInventoryController;
 use App\Http\Controllers\Api\Admin\ServiceController as AdminServiceController;
+use App\Http\Controllers\Api\Admin\WalkInController;
 use App\Http\Controllers\Api\Customer\AuthController as CustomerAuthController;
 use App\Http\Controllers\Api\Customer\BookingController;
 use App\Http\Controllers\Api\Customer\OrderController;
@@ -41,6 +42,9 @@ Route::prefix('v1')->group(function () {
         Route::middleware(['auth:sanctum', 'role:admin,super_admin', 'module:bookings'])->group(function () {
             Route::get('/bookings/counts', [AdminBookingController::class, 'counts']);
             Route::get('/bookings', [AdminBookingController::class, 'index']);
+            Route::get('/bookings/customers', [WalkInController::class, 'searchCustomers']);
+            Route::post('/bookings/walk-in-roasting', [WalkInController::class, 'storeRoasting']);
+            Route::post('/bookings/walk-in-shop', [WalkInController::class, 'storeShop']);
             Route::get('/bookings/{id}', [AdminBookingController::class, 'show'])->where('id', '[0-9]{1,18}');
             Route::post('/bookings/{id}/approve', [AdminBookingController::class, 'approve'])->where('id', '[0-9]{1,18}');
             Route::post('/bookings/{id}/reject', [AdminBookingController::class, 'reject'])->where('id', '[0-9]{1,18}');
