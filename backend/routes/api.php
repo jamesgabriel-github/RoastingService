@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Api\Admin\AdminAccountController;
 use App\Http\Controllers\Api\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Api\Admin\ServiceController as AdminServiceController;
 use App\Http\Controllers\Api\Customer\AuthController as CustomerAuthController;
 use App\Http\Controllers\Api\Customer\ProfileController;
 use App\Http\Controllers\Api\MeController;
+use App\Http\Controllers\Api\ServiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -17,6 +19,13 @@ Route::prefix('v1')->group(function () {
             Route::post('/accounts', [AdminAccountController::class, 'store']);
             Route::patch('/accounts/{id}', [AdminAccountController::class, 'update']);
         });
+
+        Route::middleware(['auth:sanctum', 'role:admin,super_admin', 'module:services'])->group(function () {
+            Route::get('/services', [AdminServiceController::class, 'index']);
+            Route::post('/services', [AdminServiceController::class, 'store']);
+            Route::put('/services/{id}', [AdminServiceController::class, 'update']);
+            Route::patch('/services/{id}/toggle', [AdminServiceController::class, 'toggle']);
+        });
     });
 
     Route::post('/login', [CustomerAuthController::class, 'login'])->middleware('throttle:6,1');
@@ -25,4 +34,6 @@ Route::prefix('v1')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->middleware('auth:sanctum');
 
     Route::get('/me', MeController::class)->middleware('auth:sanctum');
+
+    Route::get('/services', [ServiceController::class, 'index']);
 });

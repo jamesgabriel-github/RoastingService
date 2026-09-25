@@ -45,7 +45,7 @@
 **Found:** 2026-09-24 by /audit independent (scope: current; lens: security)
 **Why it matters:** `UserResource` rebuilds the permission list from `role` alone (all modules for `super_admin`, granted rows for `admin`). After the F-06 repair, `hasModulePermission()` returns false for a disabled user, but `GET /api/v1/me` (guarded only by `auth:sanctum`) still returns 200 with the full permission list for a disabled admin with a live session. `RoleRoute` then admits them to the admin shell. Backend admin routes still 403 through `EnsureRole`, so no data is exposed today. The risk is that later module UIs will trust `/me.permissions`, and the permission rule now lives in two places.
 **Suggested fix:** Derive the list from the primitive, for example `array_values(array_filter(User::MODULES, fn ($m) => $this->hasModulePermission($m)))`, or return `[]` when `! is_active`. Optionally add a `/me` test for a disabled admin.
-**Resolution:** Re-examined 2026-09-25 by /audit independent (Feature 2 review; scope: current; lens: security). Feature 2 added four new fields above the `permissions` match block, shifting it from line 28 to line 32; the permissions logic itself is unchanged. Still open.
+**Resolution:** Re-examined 2026-09-25 by /audit independent (Feature 2 review; scope: current; lens: security). Feature 2 added four new fields above the `permissions` match block, shifting it from line 28 to line 32; the permissions logic itself is unchanged. Still open. Re-examined 2026-09-25 by /audit independent (Feature 4 review; scope: current; lens: security). Feature 4's `RoleRoute requireModule` and the `AdminLayout` Services link now trust `/me.permissions`, so a disabled admin with a live session would see the Services nav link and page shell. The new backend `module:services` middleware uses `hasModulePermission()`, and `EnsureRole` still returns 403, so no service data or write is exposed. Severity unchanged. Still open.
 
 ### F-14 [P3] open - Coding standards still name `php artisan test` as the backend test command
 
@@ -77,4 +77,28 @@
 **Found:** 2026-09-25 by /audit independent (scope: current; lens: security)
 **Why it matters:** The spec deliberately makes an existing-login and a new-account-creation return the identical `200` + `UserResource` shape "so creation and existing-login look identical to the client." At the database level, though, the existing-account branch only does a `SELECT` (`User::where('phone', $phone)->first()`), while the new-account branch does that same `SELECT` plus an `INSERT` (`User::create(...)`) plus a `refresh()` (another `SELECT`). The extra write work on the creation path is a plausible timing side channel that could let an attacker distinguish "this phone is already a customer" from "this phone was just created" by measuring response latency, undermining the stated identical-response goal. Not measured in this review, and the shared `throttle:6,1` on `/api/v1/login` (see F-04) limits how much an attacker can sample. This sits in the same class as F-08's admin-login timing observation.
 **Suggested fix:** If closing this matters before v2, consider adding constant-ish work to the read path (e.g. an equivalent dummy query) or accept it as part of the v1 trust model already documented in the spec's Out of scope (the accepted create-create race) and Open Questions (no verification in v1). No code change is required to ship this feature; recording as unverified so it can be measured or explicitly accepted later.
+**Resolution:**
+
+### F-19 [P3] open - Out-of-range service input and non-numeric ids return 500 instead of 422/404
+
+**File:** backend/app/Http/Requests/Admin/StoreServiceRequest.php:29,32-33; backend/app/Http/Controllers/Api/Admin/ServiceController.php:33,41
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: quality/security)
+**Why it matters:** `roasting_rate_per_kg` and `shop_price` are validated only as `numeric|min:0`, but the columns are `decimal(10,2)` (max 99,999,999.99). `est_minutes` is `integer|min:1` against a Postgres `integer` column (max 2,147,483,647). Larger values pass validation and fail at the database with a numeric overflow, so the admin gets a generic 500 instead of a field error. Separately, `update(int $id)` and `toggle(int $id)` receive the raw route segment; a non-numeric id (for example `/admin/services/abc/toggle`) raises a PHP `TypeError` (confirmed with `php -r` coercion check, no `declare(strict_types)` needed) and returns 500, where the spec contract says `404` for a missing service. Reachable only by an authorized admin, so not a security break. The `int $id` pattern already exists in `AdminAccountController::update`.
+**Suggested fix:** Add `max:99999999.99` to both money rules and a sane `max` (for example `max:10080`) to `est_minutes`. Constrain the routes with `->whereNumber('id')` so a non-numeric id is a 404. Current requirement lost: None.
+**Resolution:**
+
+### F-20 [P3] open - Admin services list fails silently when the query errors
+
+**File:** frontend/src/features/services/ServicesPage.tsx:128
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `useServices()` reads only `data` and `isLoading`. On a 403 (for example a disabled admin whose `/me` still lists permissions, see F-11), a 5xx, or a network failure, the page shows the heading and the create form with no table and no message. The coding standards say to surface errors rather than fail silently. This repeats the F-10 pattern in a new page.
+**Suggested fix:** Destructure `isError`/`error` and render an inline `getGenericErrorMessage(error)` when the query fails. Current requirement lost: None.
+**Resolution:**
+
+### F-21 [P3] open - Service tests skip the update-path normalization, 404s, and permitted-admin update/toggle
+
+**File:** backend/tests/Feature/Admin/ServiceManagementTest.php:95
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: tests)
+**Why it matters:** The spec says the non-applicable rate/price is always stored as `null` on both `store()` and `update()`, and that `PUT` and `toggle` return `404` for a missing id. Only the create-path normalization is tested. No test switches an existing service from customer-supplied to shop-supplied via `PUT` and asserts the old rate is cleared, and no test covers a missing id. `test_admin_with_services_permission_can_manage_services` covers only create and list, although the spec's Step 2 says a permitted admin "can do the same" as a super admin. The code paths look correct on reading, so this is a coverage gap, not a known defect.
+**Suggested fix:** Add a test that updates a customer-supplied service to shop-supplied-only and asserts `roasting_rate_per_kg` is `null` in the response and database. Add `404` assertions for `PUT` and `PATCH .../toggle` on a missing id. Extend the permitted-admin test to cover update and toggle. Current requirement lost: None.
 **Resolution:**
