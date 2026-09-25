@@ -33,6 +33,19 @@ export async function completeProfile(payload: CompleteProfilePayload): Promise<
   return data
 }
 
+export interface UpdateProfilePayload {
+  first_name: string
+  middle_name: string | null
+  last_name: string
+  address: string
+}
+
+export async function updateProfile(payload: UpdateProfilePayload): Promise<Me> {
+  await ensureCsrfCookie()
+  const { data } = await api.patch<Me>('/profile', payload)
+  return data
+}
+
 export async function adminLogin(email: string, password: string): Promise<void> {
   await ensureCsrfCookie()
   await api.post('/admin/login', { email, password })

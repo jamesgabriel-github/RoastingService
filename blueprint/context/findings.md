@@ -55,14 +55,6 @@
 **Suggested fix:** Replace `php artisan test` with `composer test` at `coding-standards.md:99` and `:144`, or point those lines to the `AGENTS.md` command. Code changes: None. No current requirement is lost.
 **Resolution:** Re-examined 2026-09-25 by /audit independent (Feature 2 review; scope: current; lens: quality). Feature 2 replaced `current-feature.md` with a fresh spec that no longer contains the stale `php artisan test` line the original finding cited there (that pointer is now moot). `coding-standards.md:99` and `:144` are untouched by Feature 2 and still name `php artisan test`, so the finding stands for those two locations. Still open.
 
-### F-15 [P2] open - Profile-completion endpoint has no guard against being re-invoked after the profile is already complete
-
-**File:** backend/app/Http/Controllers/Api/Customer/ProfileController.php:9-14
-**Found:** 2026-09-25 by /audit independent (scope: current; lens: security/quality)
-**Why it matters:** The spec's Notes for the AI say `ProfileController::complete()` "is a one-time setup action, not a general profile editor," and Out of scope explicitly excludes "Editing the profile after initial setup - that's Feature 3." `ProfileController::complete()` (`$user->update($request->validated())`) and its route (`auth:sanctum` only, `backend/routes/api.php:24`) never check whether `first_name`/`last_name` are already set. The only place that enforces "one-time" is the frontend route guard (`ProfileSetupRoute.tsx`), which redirects a complete-profile customer away from `/profile-setup` in the browser. A customer who calls `POST /api/v1/profile/complete` directly (curl, devtools, a replayed request) after their profile is already complete can freely rewrite their own name and address at any time, ahead of and outside whatever contract Feature 3 is meant to define for profile edits. This does not expose another user's data (self-only), so it is not a P0/P1 authorization break, but it is a missing guard against a behavior the spec explicitly scoped out.
-**Suggested fix:** In `ProfileController::complete()` (or `CompleteProfileRequest::authorize()`), reject the request (409 or 422) when `$user->first_name` and `$user->last_name` are already set, or explicitly decide this endpoint is allowed to double as an editor until Feature 3 ships and update the spec's Out-of-scope/Notes sections to match reality.
-**Resolution:**
-
 ### F-16 [P3] open - Login's generic 422 message is now inaccurate for every remaining trigger case
 
 **File:** frontend/src/features/auth/LoginPage.tsx:44

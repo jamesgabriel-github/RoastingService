@@ -97,4 +97,23 @@ class ProfileSetupTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_profile_completion_rejects_when_already_complete(): void
+    {
+        $customer = User::factory()->completeProfile()->create();
+        $this->actingAs($customer, 'web');
+
+        $response = $this->postJson('/api/v1/profile/complete', [
+            'first_name' => 'Pedro',
+            'last_name' => 'Reyes',
+            'address' => '456 Bonifacio Ave, Quezon City',
+        ]);
+
+        $response->assertStatus(409);
+        $this->assertDatabaseHas('users', [
+            'id' => $customer->id,
+            'first_name' => 'Juan',
+            'last_name' => 'Dela Cruz',
+        ]);
+    }
 }

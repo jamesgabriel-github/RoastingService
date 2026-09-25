@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isProfileComplete } from './profile'
+import { isProfileComplete, toNullableField } from './profile'
 import type { Me } from './types'
 
 function customer(overrides: Partial<Me>): Me {
@@ -33,5 +33,23 @@ describe('isProfileComplete', () => {
 
   it('is false when neither name is set', () => {
     expect(isProfileComplete(customer({}))).toBe(false)
+  })
+})
+
+describe('toNullableField', () => {
+  it('converts an empty string to null', () => {
+    expect(toNullableField('')).toBeNull()
+  })
+
+  it('converts a whitespace-only string to null', () => {
+    expect(toNullableField('   ')).toBeNull()
+  })
+
+  it('returns a real value trimmed', () => {
+    expect(toNullableField('  Santos  ')).toBe('Santos')
+  })
+
+  it('converts undefined to null', () => {
+    expect(toNullableField(undefined)).toBeNull()
   })
 })

@@ -6,6 +6,7 @@ import {
   fetchMe,
   loginCustomer,
   logout,
+  updateProfile,
 } from './api'
 
 export function useMe() {
@@ -32,6 +33,17 @@ export function useCompleteProfile() {
 
   return useMutation({
     mutationFn: completeProfile,
+    onSuccess: (me) => {
+      queryClient.setQueryData(['me'], me)
+    },
+  })
+}
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: updateProfile,
     onSuccess: (me) => {
       queryClient.setQueryData(['me'], me)
     },

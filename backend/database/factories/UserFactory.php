@@ -59,4 +59,14 @@ class UserFactory extends Factory
             'role' => 'super_admin',
         ]);
     }
+
+    public function completeProfile(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'first_name' => 'Juan',
+            'middle_name' => 'Santos',
+            'last_name' => 'Dela Cruz',
+            'address' => '123 Rizal St, Manila',
+        ]);
+    }
 }

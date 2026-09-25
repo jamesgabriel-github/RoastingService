@@ -22,6 +22,7 @@ Route::prefix('v1')->group(function () {
     Route::post('/login', [CustomerAuthController::class, 'login'])->middleware('throttle:6,1');
     Route::post('/logout', [CustomerAuthController::class, 'logout'])->middleware('auth:sanctum');
     Route::post('/profile/complete', [ProfileController::class, 'complete'])->middleware('auth:sanctum');
+    Route::patch('/profile', [ProfileController::class, 'update'])->middleware('auth:sanctum');
 
     Route::get('/me', MeController::class)->middleware('auth:sanctum');
 });
