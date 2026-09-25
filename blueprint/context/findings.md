@@ -134,3 +134,11 @@
 **Why it matters:** The F-22 repair added `'low_stock_threshold' => ['required', 'integer', 'min:0']` with no `max`. The column is a Postgres `integer` (`unsignedInteger` maps to signed `integer` on Postgres; max 2,147,483,647). A value such as 3000000000 passes Laravel's `integer` rule on 64-bit PHP and then fails at the database with a numeric overflow, so the admin gets a generic 500 instead of a field error. The frontend zod schema (`ServicesPage.tsx:23`) also has no max. This is the F-19 and F-23 pattern on a new field. Reachable only by an authorized admin, so it is not a security break, and nothing is written.
 **Suggested fix:** Add a sane `max` (for example `max:1000000`) to the rule, and optionally mirror it in the zod schema. Current requirement lost: None.
 **Resolution:**
+
+### F-34 [P3] open - Booking form's services query fails silently
+
+**File:** frontend/src/features/bookings/NewBookingPage.tsx:68
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `useBookableServices()` reads only `data` and `isLoading`. If `GET /api/v1/services` fails (a 5xx or a network error), the page renders an item dropdown with only "Select an item". There is no message, so the customer cannot book and is not told why. The coding standards say to surface errors rather than fail silently. This is the F-10/F-20/F-24 pattern on the first customer-facing form. The submit mutation surfaces errors correctly.
+**Suggested fix:** Destructure `isError`/`error` from `useBookableServices()` and render an inline `getGenericErrorMessage(error)` in the Items section when the query fails. Current requirement lost: None.
+**Resolution:**

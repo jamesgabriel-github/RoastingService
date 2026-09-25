@@ -7,6 +7,7 @@ import { AdminLoginPage } from '@/features/auth/AdminLoginPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ProfileSetupPage } from '@/features/auth/ProfileSetupPage'
 import { AdminAccountsPage } from '@/features/admin-accounts/AdminAccountsPage'
+import { NewBookingPage } from '@/features/bookings/NewBookingPage'
 import { InventoryPage } from '@/features/inventory/InventoryPage'
 import { ServicesPage } from '@/features/services/ServicesPage'
 import { ProfileSetupRoute } from '@/routes/ProfileSetupRoute'
@@ -30,6 +31,7 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<CustomerLayout />}>
           <Route path="/account" element={<AccountPage />} />
+          <Route path="/book" element={<NewBookingPage />} />
         </Route>
       </Route>
 
