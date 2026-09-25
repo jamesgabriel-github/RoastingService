@@ -29,7 +29,7 @@ Replace these examples with your own features:
 - [x] 9. **Admin booking queues** - tabbed status queues with counts, search by code/name/phone, waiting time, and a booking detail view
 - [x] 10. **Approve & weigh-in** - admin approves bring-your-own bookings with a drop-off schedule or rejects with a reason, then weighs in the raw food to lock the final price and confirm
 - [x] 11. **Shop order confirmation** - admin confirms shop orders as final or rejects them with a reason, releasing reserved stock
-- [ ] 12. **Cooking & fulfillment** - admin starts cooking (sets estimated ready time), marks ready for pickup or out for delivery, completes, and handles no-shows and cancellations with stock release
+- [x] 12. **Cooking & fulfillment** - admin starts cooking (sets estimated ready time), marks ready for pickup or out for delivery, completes, and handles no-shows and cancellations with stock release
 - [ ] 13. **Walk-in bookings** - admin creates either booking type for a registered customer or a guest (name + phone), with instant weigh-in when the food is on hand
 - [ ] 14. **Payments** - admin records full payments (cash, GCash, card) against confirmed bookings, with paid vs balance shown on the booking and a filterable payments list
 - [ ] 15. **Sales dashboard** - sales today/week/month from payments split by booking type, bookings by status, today's cooking/ready queue, top items and low-stock alerts

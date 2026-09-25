@@ -47,6 +47,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/bookings/{id}/weigh-in', [AdminBookingController::class, 'weighIn'])->where('id', '[0-9]{1,18}');
             Route::post('/bookings/{id}/confirm-order', [AdminBookingController::class, 'confirmOrder'])->where('id', '[0-9]{1,18}');
             Route::post('/bookings/{id}/reject-order', [AdminBookingController::class, 'rejectOrder'])->where('id', '[0-9]{1,18}');
+            Route::post('/bookings/{id}/start-cooking', [AdminBookingController::class, 'startCooking'])->where('id', '[0-9]{1,18}');
+            Route::post('/bookings/{id}/ready', [AdminBookingController::class, 'ready'])->where('id', '[0-9]{1,18}');
+            Route::post('/bookings/{id}/out-for-delivery', [AdminBookingController::class, 'outForDelivery'])->where('id', '[0-9]{1,18}');
+            Route::post('/bookings/{id}/complete', [AdminBookingController::class, 'complete'])->where('id', '[0-9]{1,18}');
+            Route::post('/bookings/{id}/no-show', [AdminBookingController::class, 'noShow'])->where('id', '[0-9]{1,18}');
+            Route::post('/bookings/{id}/cancel', [AdminBookingController::class, 'cancel'])->where('id', '[0-9]{1,18}');
         });
     });
 

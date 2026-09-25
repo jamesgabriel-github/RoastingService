@@ -13,6 +13,10 @@ export interface WeighInPayload {
   items: { id: number; final_weight_kg: number }[]
 }
 
+export interface RemarksPayload {
+  remarks?: string
+}
+
 export async function fetchBookingCounts(): Promise<BookingCounts> {
   const { data } = await api.get<BookingCounts>('/admin/bookings/counts')
   return data
@@ -61,5 +65,41 @@ export async function confirmOrder(id: number): Promise<AdminBooking> {
 export async function rejectOrder(id: number, payload: RejectPayload): Promise<AdminBooking> {
   await ensureCsrfCookie()
   const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/reject-order`, payload)
+  return data
+}
+
+export async function startCooking(id: number): Promise<AdminBooking> {
+  await ensureCsrfCookie()
+  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/start-cooking`)
+  return data
+}
+
+export async function markReady(id: number): Promise<AdminBooking> {
+  await ensureCsrfCookie()
+  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/ready`)
+  return data
+}
+
+export async function markOutForDelivery(id: number): Promise<AdminBooking> {
+  await ensureCsrfCookie()
+  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/out-for-delivery`)
+  return data
+}
+
+export async function completeBooking(id: number): Promise<AdminBooking> {
+  await ensureCsrfCookie()
+  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/complete`)
+  return data
+}
+
+export async function noShowBooking(id: number, payload: RemarksPayload): Promise<AdminBooking> {
+  await ensureCsrfCookie()
+  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/no-show`, payload)
+  return data
+}
+
+export async function cancelBooking(id: number, payload: RemarksPayload): Promise<AdminBooking> {
+  await ensureCsrfCookie()
+  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/cancel`, payload)
   return data
 }

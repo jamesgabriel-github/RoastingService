@@ -218,6 +218,139 @@ class BookingController extends Controller
         return new AdminBookingResource($booking->load(self::detailEagerLoads()));
     }
 
+    public function startCooking(Request $request, BookingStatusEngine $statusEngine, int $id): AdminBookingResource
+    {
+        $booking = DB::transaction(function () use ($request, $statusEngine, $id) {
+            $booking = Booking::with('items.service')->lockForUpdate()->findOrFail($id);
+
+            $this->guardAnyTransition($booking, $statusEngine, 'cooking', 'started');
+
+            $minutes = $booking->items->max(fn ($item) => $item->service->est_minutes);
+
+            $booking->cooking_started_at = now();
+            $booking->est_ready_at = $booking->cooking_started_at->addMinutes($minutes);
+            $booking->save();
+
+            $statusEngine->transition($booking, 'cooking', $request->user()->id);
+
+            return $booking;
+        });
+
+        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+    }
+
+    public function ready(Request $request, BookingStatusEngine $statusEngine, int $id): AdminBookingResource
+    {
+        $booking = DB::transaction(function () use ($request, $statusEngine, $id) {
+            $booking = Booking::lockForUpdate()->findOrFail($id);
+
+            $this->guardAnyTransition($booking, $statusEngine, 'ready', 'marked ready');
+
+            if ($booking->fulfillment !== 'pickup') {
+                throw ValidationException::withMessages([
+                    'status' => 'This booking cannot be marked ready right now.',
+                ]);
+            }
+
+            $statusEngine->transition($booking, 'ready', $request->user()->id);
+
+            return $booking;
+        });
+
+        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+    }
+
+    public function outForDelivery(Request $request, BookingStatusEngine $statusEngine, int $id): AdminBookingResource
+    {
+        $booking = DB::transaction(function () use ($request, $statusEngine, $id) {
+            $booking = Booking::lockForUpdate()->findOrFail($id);
+
+            $this->guardAnyTransition($booking, $statusEngine, 'out_for_delivery', 'marked out for delivery');
+
+            if ($booking->fulfillment !== 'delivery') {
+                throw ValidationException::withMessages([
+                    'status' => 'This booking cannot be marked out for delivery right now.',
+                ]);
+            }
+
+            $statusEngine->transition($booking, 'out_for_delivery', $request->user()->id);
+
+            return $booking;
+        });
+
+        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+    }
+
+    public function complete(Request $request, BookingStatusEngine $statusEngine, int $id): AdminBookingResource
+    {
+        $booking = DB::transaction(function () use ($request, $statusEngine, $id) {
+            $booking = Booking::lockForUpdate()->findOrFail($id);
+
+            $this->guardAnyTransition($booking, $statusEngine, 'completed', 'completed');
+
+            $booking->completed_at = now();
+            $booking->save();
+
+            $statusEngine->transition($booking, 'completed', $request->user()->id);
+
+            return $booking;
+        });
+
+        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+    }
+
+    public function noShow(Request $request, BookingStatusEngine $statusEngine, int $id): AdminBookingResource
+    {
+        $validated = $request->validate([
+            'remarks' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $booking = DB::transaction(function () use ($request, $statusEngine, $id, $validated) {
+            $booking = Booking::lockForUpdate()->findOrFail($id);
+
+            $this->guardTransition($booking, $statusEngine, 'no_show', 'marked no-show');
+
+            $statusEngine->transition($booking, 'no_show', $request->user()->id, $validated['remarks'] ?? null);
+
+            return $booking;
+        });
+
+        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+    }
+
+    public function cancel(Request $request, BookingStatusEngine $statusEngine, int $id): AdminBookingResource
+    {
+        $validated = $request->validate([
+            'remarks' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $booking = DB::transaction(function () use ($request, $statusEngine, $id, $validated) {
+            $booking = Booking::with('items')->lockForUpdate()->findOrFail($id);
+
+            $this->guardAnyTransition($booking, $statusEngine, 'cancelled', 'cancelled');
+
+            if ($booking->source_type === 'shop_supplied') {
+                foreach ($booking->items->sortBy('service_id') as $item) {
+                    Service::where('id', $item->service_id)->increment('stock_qty', $item->qty);
+
+                    InventoryLog::create([
+                        'service_id' => $item->service_id,
+                        'change_qty' => $item->qty,
+                        'reason' => 'release',
+                        'booking_id' => $booking->id,
+                        'created_by' => $request->user()->id,
+                    ]);
+                }
+            }
+
+            $statusEngine->transition($booking, 'cancelled', $request->user()->id, $validated['remarks'] ?? null);
+
+            return $booking;
+        });
+
+        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+    }
+
     /**
      * Approve, reject, and weigh-in are only for bring-your-own bookings - a
      * shop-supplied order reaches `rejected`/`confirmed` through feature 11's
@@ -247,6 +380,21 @@ class BookingController extends Controller
             $booking->source_type !== 'shop_supplied'
             || ! $statusEngine->isAllowed($booking->source_type, $booking->status, $to)
         ) {
+            throw ValidationException::withMessages([
+                'status' => "This booking cannot be {$action} right now.",
+            ]);
+        }
+    }
+
+    /**
+     * For actions valid across both source types (start-cooking, ready,
+     * out-for-delivery, complete, cancel) - only checks `isAllowed`, unlike
+     * `guardTransition`/`guardOrderTransition` which stay scoped to one
+     * source type.
+     */
+    private function guardAnyTransition(Booking $booking, BookingStatusEngine $statusEngine, string $to, string $action): void
+    {
+        if (! $statusEngine->isAllowed($booking->source_type, $booking->status, $to)) {
             throw ValidationException::withMessages([
                 'status' => "This booking cannot be {$action} right now.",
             ]);

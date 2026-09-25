@@ -1,13 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ApprovePayload, RejectPayload, WeighInPayload } from './api'
+import type { ApprovePayload, RejectPayload, RemarksPayload, WeighInPayload } from './api'
 import {
   approveBooking,
+  cancelBooking,
+  completeBooking,
   confirmOrder,
   fetchAdminBookingDetail,
   fetchAdminBookings,
   fetchBookingCounts,
+  markOutForDelivery,
+  markReady,
+  noShowBooking,
   rejectBooking,
   rejectOrder,
+  startCooking,
   weighInBooking,
 } from './api'
 import type { QueueStatus } from './types'
@@ -84,6 +90,60 @@ export function useRejectOrder() {
 
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: RejectPayload }) => rejectOrder(id, payload),
+    onSuccess: (_data, { id }) => invalidate(id),
+  })
+}
+
+export function useStartCooking() {
+  const invalidate = useBookingActionInvalidation()
+
+  return useMutation({
+    mutationFn: (id: number) => startCooking(id),
+    onSuccess: (_data, id) => invalidate(id),
+  })
+}
+
+export function useMarkReady() {
+  const invalidate = useBookingActionInvalidation()
+
+  return useMutation({
+    mutationFn: (id: number) => markReady(id),
+    onSuccess: (_data, id) => invalidate(id),
+  })
+}
+
+export function useMarkOutForDelivery() {
+  const invalidate = useBookingActionInvalidation()
+
+  return useMutation({
+    mutationFn: (id: number) => markOutForDelivery(id),
+    onSuccess: (_data, id) => invalidate(id),
+  })
+}
+
+export function useCompleteBooking() {
+  const invalidate = useBookingActionInvalidation()
+
+  return useMutation({
+    mutationFn: (id: number) => completeBooking(id),
+    onSuccess: (_data, id) => invalidate(id),
+  })
+}
+
+export function useNoShowBooking() {
+  const invalidate = useBookingActionInvalidation()
+
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: RemarksPayload }) => noShowBooking(id, payload),
+    onSuccess: (_data, { id }) => invalidate(id),
+  })
+}
+
+export function useCancelBooking() {
+  const invalidate = useBookingActionInvalidation()
+
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: RemarksPayload }) => cancelBooking(id, payload),
     onSuccess: (_data, { id }) => invalidate(id),
   })
 }

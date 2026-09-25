@@ -57,6 +57,9 @@ export interface AdminBooking {
   confirmed_at: string | null
   confirmed_by_name: string | null
   weighed_at: string | null
+  cooking_started_at: string | null
+  est_ready_at: string | null
+  completed_at: string | null
   notes: string | null
   waiting_minutes: number
   items?: AdminBookingItem[]
@@ -70,4 +73,14 @@ export interface PaginatedAdminBookings {
     current_page: number
     last_page: number
   }
+}
+
+const CANCELLABLE_STATUSES: Record<AdminBooking['source_type'], readonly string[]> = {
+  customer_supplied: ['pending_review', 'approved', 'confirmed'],
+  shop_supplied: ['pending_confirmation', 'confirmed'],
+}
+
+/** UI-only convenience mirroring BookingStatusEngine's cancellable-from set; the server is authoritative. */
+export function isAdminCancellable(booking: Pick<AdminBooking, 'source_type' | 'status'>): boolean {
+  return CANCELLABLE_STATUSES[booking.source_type].includes(booking.status)
 }

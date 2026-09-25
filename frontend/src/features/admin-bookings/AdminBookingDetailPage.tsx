@@ -9,12 +9,19 @@ import { getGenericErrorMessage } from '@/lib/errors'
 import {
   useAdminBookingDetail,
   useApproveBooking,
+  useCancelBooking,
+  useCompleteBooking,
   useConfirmOrder,
+  useMarkOutForDelivery,
+  useMarkReady,
+  useNoShowBooking,
   useRejectBooking,
   useRejectOrder,
+  useStartCooking,
   useWeighInBooking,
 } from './hooks'
 import type { AdminBooking } from './types'
+import { isAdminCancellable } from './types'
 
 function getActionErrorMessage(error: unknown): string {
   if (isAxiosError(error) && error.response?.status === 422) {
@@ -190,6 +197,132 @@ function WeighInActions({ booking }: { booking: AdminBooking }) {
   )
 }
 
+function StartCookingAction({ booking }: { booking: AdminBooking }) {
+  const [error, setError] = useState<string | null>(null)
+  const startCooking = useStartCooking()
+
+  const onStart = () => {
+    setError(null)
+    startCooking.mutate(booking.id, { onError: (err) => setError(getActionErrorMessage(err)) })
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3">
+      <h2 className="font-semibold">Actions</h2>
+      <Button disabled={startCooking.isPending} onClick={onStart}>
+        Start cooking
+      </Button>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  )
+}
+
+function CookingActions({ booking }: { booking: AdminBooking }) {
+  const [error, setError] = useState<string | null>(null)
+  const markReady = useMarkReady()
+  const markOutForDelivery = useMarkOutForDelivery()
+  const isSaving = markReady.isPending || markOutForDelivery.isPending
+
+  const onAdvance = () => {
+    setError(null)
+    if (booking.fulfillment === 'pickup') {
+      markReady.mutate(booking.id, { onError: (err) => setError(getActionErrorMessage(err)) })
+    } else {
+      markOutForDelivery.mutate(booking.id, { onError: (err) => setError(getActionErrorMessage(err)) })
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3">
+      <h2 className="font-semibold">Actions</h2>
+      <Button disabled={isSaving} onClick={onAdvance}>
+        {booking.fulfillment === 'pickup' ? 'Mark ready' : 'Out for delivery'}
+      </Button>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  )
+}
+
+function CompleteAction({ booking }: { booking: AdminBooking }) {
+  const [error, setError] = useState<string | null>(null)
+  const complete = useCompleteBooking()
+
+  const onComplete = () => {
+    setError(null)
+    complete.mutate(booking.id, { onError: (err) => setError(getActionErrorMessage(err)) })
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3">
+      <h2 className="font-semibold">Actions</h2>
+      <Button disabled={complete.isPending} onClick={onComplete}>
+        Complete
+      </Button>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  )
+}
+
+function NoShowAction({ booking }: { booking: AdminBooking }) {
+  const [remarks, setRemarks] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const noShow = useNoShowBooking()
+
+  const onNoShow = () => {
+    setError(null)
+    noShow.mutate(
+      { id: booking.id, payload: { remarks: remarks.trim() || undefined } },
+      { onError: (err) => setError(getActionErrorMessage(err)) }
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3">
+      <h2 className="font-semibold">No-show</h2>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="no_show_remarks">Remarks (optional)</Label>
+        <div className="flex gap-2">
+          <Input id="no_show_remarks" value={remarks} onChange={(event) => setRemarks(event.target.value)} />
+          <Button variant="outline" disabled={noShow.isPending} onClick={onNoShow}>
+            Mark no-show
+          </Button>
+        </div>
+      </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  )
+}
+
+function CancelAction({ booking }: { booking: AdminBooking }) {
+  const [remarks, setRemarks] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const cancel = useCancelBooking()
+
+  const onCancel = () => {
+    setError(null)
+    cancel.mutate(
+      { id: booking.id, payload: { remarks: remarks.trim() || undefined } },
+      { onError: (err) => setError(getActionErrorMessage(err)) }
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3">
+      <h2 className="font-semibold">Cancel</h2>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="cancel_remarks">Remarks (optional)</Label>
+        <div className="flex gap-2">
+          <Input id="cancel_remarks" value={remarks} onChange={(event) => setRemarks(event.target.value)} />
+          <Button variant="outline" disabled={cancel.isPending} onClick={onCancel}>
+            Cancel booking
+          </Button>
+        </div>
+      </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  )
+}
+
 export function AdminBookingDetailPage() {
   const params = useParams<{ id: string }>()
   const id = Number(params.id)
@@ -232,11 +365,23 @@ export function AdminBookingDetailPage() {
             {booking.confirmed_by_name ? ` - confirmed by ${booking.confirmed_by_name}` : ''}
           </p>
         )}
+        {booking.cooking_started_at && (
+          <p>Cooking started: {new Date(booking.cooking_started_at).toLocaleString()}</p>
+        )}
+        {booking.est_ready_at && <p>Estimated ready: {new Date(booking.est_ready_at).toLocaleString()}</p>}
+        {booking.completed_at && <p>Completed: {new Date(booking.completed_at).toLocaleString()}</p>}
       </div>
 
       {isRoasting && booking.status === 'pending_review' && <ApproveRejectActions booking={booking} />}
       {isRoasting && booking.status === 'approved' && <WeighInActions booking={booking} />}
+      {isRoasting && booking.status === 'approved' && <NoShowAction booking={booking} />}
       {!isRoasting && booking.status === 'pending_confirmation' && <ConfirmRejectOrderActions booking={booking} />}
+      {booking.status === 'confirmed' && <StartCookingAction booking={booking} />}
+      {booking.status === 'cooking' && <CookingActions booking={booking} />}
+      {(booking.status === 'ready' || booking.status === 'out_for_delivery') && (
+        <CompleteAction booking={booking} />
+      )}
+      {isAdminCancellable(booking) && <CancelAction booking={booking} />}
 
       <div className="flex flex-col gap-2 rounded-lg border p-3">
         <h2 className="font-semibold">Status timeline</h2>
