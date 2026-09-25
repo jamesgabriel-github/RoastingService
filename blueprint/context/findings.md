@@ -158,3 +158,11 @@
 **Why it matters:** The F-35 repair changed `OrderController::store` to decrement one shared in-memory `Service` per id and save each row once after the loop. The correctness of repeated lines (for example B, A, B) now depends on that shared instance. The only test with repeated `service_id`s is `test_more_than_twenty_items_is_rejected`, which fails Form Request validation (`max:20`) before the controller runs. No repo test proves that a second line sees the first line's decrement, or that duplicate lines together exceeding stock roll back the whole order. The F-35 note says existing tests covered this, but they do not. A reviewer probe confirmed the current behavior is correct, so this is a coverage gap, not a defect.
 **Suggested fix:** Add two feature tests: a successful order with lines B, A, B (assert both final `stock_qty` values, three `reserve` logs, and the total), and a duplicate-line order that exceeds stock (assert 422 on the later line's `qty` and no stock, log, or booking writes). Current requirement lost: None.
 **Resolution:**
+
+### F-41 [P3] open - My Bookings list and detail do not surface query errors
+
+**File:** frontend/src/features/bookings/MyBookingsPage.tsx:7; frontend/src/features/bookings/BookingDetailPage.tsx:13-23
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: quality)
+**Why it matters:** Both pages read only `data`/`isLoading`. If `GET /bookings` fails, the list page shows only its heading with no message. On the detail page, a 5xx or network failure ends in "Booking not found.", which is misleading. The shared `QueryClient` also uses the default of 3 retries (`lib/queryClient.ts`), so a real 404 shows "Loading…" for several seconds before that message. The coding standards say to surface errors rather than fail silently. This repeats F-34/F-36 on the new pages.
+**Suggested fix:** Destructure `isError`/`error` and render `getGenericErrorMessage(error)`. Show "Booking not found." only for an Axios 404, and consider `retry: false` for 404s on the detail query. Current requirement lost: None.
+**Resolution:**

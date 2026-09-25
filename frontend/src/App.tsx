@@ -7,7 +7,9 @@ import { AdminLoginPage } from '@/features/auth/AdminLoginPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ProfileSetupPage } from '@/features/auth/ProfileSetupPage'
 import { AdminAccountsPage } from '@/features/admin-accounts/AdminAccountsPage'
+import { BookingDetailPage } from '@/features/bookings/BookingDetailPage'
 import { BookingTypePage } from '@/features/bookings/BookingTypePage'
+import { MyBookingsPage } from '@/features/bookings/MyBookingsPage'
 import { NewBookingPage } from '@/features/bookings/NewBookingPage'
 import { InventoryPage } from '@/features/inventory/InventoryPage'
 import { NewShopOrderPage } from '@/features/orders/NewShopOrderPage'
@@ -36,6 +38,8 @@ function App() {
           <Route path="/book" element={<BookingTypePage />} />
           <Route path="/book/roasting" element={<NewBookingPage />} />
           <Route path="/book/shop" element={<NewShopOrderPage />} />
+          <Route path="/bookings" element={<MyBookingsPage />} />
+          <Route path="/bookings/:id" element={<BookingDetailPage />} />
         </Route>
       </Route>
 

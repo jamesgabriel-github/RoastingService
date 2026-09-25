@@ -31,6 +31,7 @@ class BookingResource extends JsonResource
             'preferred_dropoff_at' => $this->preferred_dropoff_at,
             'notes' => $this->notes,
             'items' => BookingItemResource::collection($this->whenLoaded('items')),
+            'status_logs' => BookingStatusLogResource::collection($this->whenLoaded('statusLogs')),
             'created_at' => $this->created_at,
         ];
     }

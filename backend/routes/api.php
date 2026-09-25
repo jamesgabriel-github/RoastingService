@@ -43,8 +43,13 @@ Route::prefix('v1')->group(function () {
     Route::post('/profile/complete', [ProfileController::class, 'complete'])->middleware('auth:sanctum');
     Route::patch('/profile', [ProfileController::class, 'update'])->middleware('auth:sanctum');
 
-    Route::post('/bookings', [BookingController::class, 'store'])->middleware(['auth:sanctum', 'role:customer']);
-    Route::post('/orders', [OrderController::class, 'store'])->middleware(['auth:sanctum', 'role:customer']);
+    Route::middleware(['auth:sanctum', 'role:customer'])->group(function () {
+        Route::get('/bookings', [BookingController::class, 'index']);
+        Route::post('/bookings', [BookingController::class, 'store']);
+        Route::get('/bookings/{id}', [BookingController::class, 'show'])->where('id', '[0-9]{1,18}');
+        Route::post('/bookings/{id}/cancel', [BookingController::class, 'cancel'])->where('id', '[0-9]{1,18}');
+        Route::post('/orders', [OrderController::class, 'store']);
+    });
 
     Route::get('/me', MeController::class)->middleware('auth:sanctum');
 

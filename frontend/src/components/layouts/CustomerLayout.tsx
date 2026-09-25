@@ -7,6 +7,7 @@ export function CustomerLayout() {
         <span className="font-semibold">My Account</span>
         <nav className="flex gap-4 text-sm">
           <Link to="/book">Book Now</Link>
+          <Link to="/bookings">My Bookings</Link>
           <Link to="/account">Account</Link>
         </nav>
       </header>

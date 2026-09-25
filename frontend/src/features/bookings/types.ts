@@ -21,6 +21,14 @@ export interface BookingItem {
 
 export type Fulfillment = 'pickup' | 'delivery'
 
+export interface BookingStatusLog {
+  id: number
+  status: string
+  changed_by_name: string | null
+  remarks: string | null
+  created_at: string
+}
+
 export interface Booking {
   id: number
   code: string
@@ -31,8 +39,9 @@ export interface Booking {
   shipping_fee: string
   estimated_total: string
   total_amount: string | null
-  preferred_dropoff_at: string
+  preferred_dropoff_at: string | null
   notes: string | null
   items: BookingItem[]
+  status_logs?: BookingStatusLog[]
   created_at: string
 }

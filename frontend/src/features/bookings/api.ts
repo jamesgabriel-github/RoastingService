@@ -19,3 +19,19 @@ export async function createBooking(payload: NewBookingPayload): Promise<Booking
   const { data } = await api.post<Booking>('/bookings', payload)
   return data
 }
+
+export async function fetchMyBookings(): Promise<Booking[]> {
+  const { data } = await api.get<Booking[]>('/bookings')
+  return data
+}
+
+export async function fetchBookingDetail(id: number): Promise<Booking> {
+  const { data } = await api.get<Booking>(`/bookings/${id}`)
+  return data
+}
+
+export async function cancelBooking(id: number): Promise<Booking> {
+  await ensureCsrfCookie()
+  const { data } = await api.post<Booking>(`/bookings/${id}/cancel`)
+  return data
+}
