@@ -42,6 +42,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/bookings/counts', [AdminBookingController::class, 'counts']);
             Route::get('/bookings', [AdminBookingController::class, 'index']);
             Route::get('/bookings/{id}', [AdminBookingController::class, 'show'])->where('id', '[0-9]{1,18}');
+            Route::post('/bookings/{id}/approve', [AdminBookingController::class, 'approve'])->where('id', '[0-9]{1,18}');
+            Route::post('/bookings/{id}/reject', [AdminBookingController::class, 'reject'])->where('id', '[0-9]{1,18}');
+            Route::post('/bookings/{id}/weigh-in', [AdminBookingController::class, 'weighIn'])->where('id', '[0-9]{1,18}');
         });
     });
 

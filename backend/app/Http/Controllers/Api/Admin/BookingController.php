@@ -3,11 +3,17 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ApproveBookingRequest;
+use App\Http\Requests\Admin\RejectBookingRequest;
+use App\Http\Requests\Admin\WeighInBookingRequest;
 use App\Http\Resources\AdminBookingResource;
 use App\Models\Booking;
 use App\Models\BookingStatusLog;
+use App\Services\Booking\BookingStatusEngine;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
 {
@@ -71,13 +77,125 @@ class BookingController extends Controller
 
     public function show(int $id): AdminBookingResource
     {
-        $booking = Booking::with([
+        $booking = Booking::with(self::detailEagerLoads())->findOrFail($id);
+
+        return new AdminBookingResource($booking);
+    }
+
+    public function approve(ApproveBookingRequest $request, BookingStatusEngine $statusEngine, int $id): AdminBookingResource
+    {
+        $booking = DB::transaction(function () use ($request, $statusEngine, $id) {
+            $booking = Booking::lockForUpdate()->findOrFail($id);
+
+            $this->guardTransition($booking, $statusEngine, 'approved', 'approved');
+
+            $booking->dropoff_at = $request->validated('dropoff_at');
+            $booking->approved_at = now();
+            $booking->approved_by = $request->user()->id;
+            $booking->save();
+
+            $statusEngine->transition($booking, 'approved', $request->user()->id);
+
+            return $booking;
+        });
+
+        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+    }
+
+    public function reject(RejectBookingRequest $request, BookingStatusEngine $statusEngine, int $id): AdminBookingResource
+    {
+        $booking = DB::transaction(function () use ($request, $statusEngine, $id) {
+            $booking = Booking::lockForUpdate()->findOrFail($id);
+
+            $this->guardTransition($booking, $statusEngine, 'rejected', 'rejected');
+
+            $reason = $request->validated('reason');
+
+            $booking->reject_reason = $reason;
+            $booking->save();
+
+            $statusEngine->transition($booking, 'rejected', $request->user()->id, $reason);
+
+            return $booking;
+        });
+
+        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+    }
+
+    public function weighIn(WeighInBookingRequest $request, BookingStatusEngine $statusEngine, int $id): AdminBookingResource
+    {
+        $booking = DB::transaction(function () use ($request, $statusEngine, $id) {
+            $booking = Booking::with('items')->lockForUpdate()->findOrFail($id);
+
+            $this->guardTransition($booking, $statusEngine, 'confirmed', 'weighed in');
+
+            $submitted = collect($request->validated('items'))->keyBy(fn (array $item) => (int) $item['id']);
+            $bookingItemIds = $booking->items->pluck('id');
+
+            if ($submitted->keys()->sort()->values()->all() !== $bookingItemIds->sort()->values()->all()) {
+                throw ValidationException::withMessages([
+                    'items' => 'Every item on this booking needs a final weight.',
+                ]);
+            }
+
+            $totalAmount = 0.0;
+
+            foreach ($booking->items as $item) {
+                $finalWeightKg = (float) $submitted[$item->id]['final_weight_kg'];
+                $subtotal = round((float) $item->rate * $finalWeightKg, 2);
+
+                $item->final_weight_kg = $finalWeightKg;
+                $item->subtotal = $subtotal;
+                $item->save();
+
+                $totalAmount += $subtotal;
+            }
+
+            $booking->total_amount = round($totalAmount, 2);
+            $booking->weighed_at = now();
+            $booking->confirmed_at = now();
+            $booking->confirmed_by = $request->user()->id;
+            $booking->save();
+
+            $statusEngine->transition($booking, 'confirmed', $request->user()->id);
+
+            return $booking;
+        });
+
+        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+    }
+
+    /**
+     * Approve, reject, and weigh-in are only for bring-your-own bookings - a
+     * shop-supplied order reaches `rejected`/`confirmed` through feature 11's
+     * own flow instead, which also releases its reserved stock on rejection.
+     * `BookingStatusEngine::isAllowed` alone does not scope to source type,
+     * since `shop_supplied` can reach both statuses too, so this checks both.
+     */
+    private function guardTransition(Booking $booking, BookingStatusEngine $statusEngine, string $to, string $action): void
+    {
+        if (
+            $booking->source_type !== 'customer_supplied'
+            || ! $statusEngine->isAllowed($booking->source_type, $booking->status, $to)
+        ) {
+            throw ValidationException::withMessages([
+                'status' => "This booking cannot be {$action} right now.",
+            ]);
+        }
+    }
+
+    /**
+     * @return array<int|string, string|\Closure>
+     */
+    private static function detailEagerLoads(): array
+    {
+        return [
             'items.service',
             'customer',
             'latestStatusLog',
             'statusLogs' => fn ($query) => $query->orderBy('id')->with('changer'),
-        ])->findOrFail($id);
-
-        return new AdminBookingResource($booking);
+            'approver',
+            'confirmer',
+        ];
     }
 }

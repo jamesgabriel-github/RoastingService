@@ -50,6 +50,13 @@ export interface AdminBooking {
   estimated_total: string
   total_amount: string | null
   preferred_dropoff_at: string | null
+  dropoff_at: string | null
+  approved_at: string | null
+  approved_by_name: string | null
+  reject_reason: string | null
+  confirmed_at: string | null
+  confirmed_by_name: string | null
+  weighed_at: string | null
   notes: string | null
   waiting_minutes: number
   items?: AdminBookingItem[]
