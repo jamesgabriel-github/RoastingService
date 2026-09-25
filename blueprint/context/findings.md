@@ -270,3 +270,19 @@
 **Why it matters:** `usePayments()` reads only `data`/`isLoading`. On a 403 (for example a disabled admin whose `/me` still lists permissions, see F-11), a 5xx, or a network failure, `PaymentsListPage` renders only the heading and filters: the "No payments recorded yet." branch and the table branch both require `data`, which is `undefined` on error, and there is no error branch at all. The admin cannot tell "no payments match" from "the request failed." The coding standards say to surface errors rather than fail silently. This repeats the same pattern already tracked eight times in this ledger (F-10, F-20, F-24, F-34, F-36, F-41, F-44, F-57), now on the new payments list page.
 **Suggested fix:** Destructure `isError`/`error` from `usePayments()` and render an inline `getGenericErrorMessage(error)` when the query fails. Current requirement lost: None.
 **Resolution:**
+
+### F-62 [P2] open - Dashboard sales totals are computed with float arithmetic on decimal money columns
+
+**File:** backend/app/Http/Controllers/Api/Admin/DashboardController.php:59-64
+**Found:** 2026-09-26 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `payments.amount` is a `decimal(10,2)` column. `salesSince()` sums it per `source_type` with Postgres `sum()` (returned as a numeric string by `pluck('aggregate', 'source_type')`), then does `(float) ($totals['customer_supplied'] ?? 0)` and `(float) ($totals['shop_supplied'] ?? 0)`, and adds those two floats together for `total`. `coding-standards.md`'s Database section says "Money and other precise decimals: use decimal/numeric columns, never float," and this is the same anti-pattern already recorded at F-60 (`AdminBookingResource.php`), now duplicated in a second, new file. Unlike F-60 (at most one payment per booking), this endpoint sums an unbounded number of `paid` payments across every booking in the selected window (all of "this month," for example), so more binary-floating-point terms are summed before `number_format(..., 2)` rounds the result. With realistic shop volumes the accumulated error stays far below a cent and is invisible after rounding, so no incorrect total is reachable today, but the construction is a direct, growing violation of an explicit, already-flagged project standard.
+**Suggested fix:** Do the aggregation as strings, for example format the query-side sum with `to_char`/`::text` or fold the plucked numeric strings with `bcadd`, instead of casting to `float`. Current requirement lost: None.
+**Resolution:**
+
+### F-63 [P3] open - Dashboard page renders nothing at all when its query errors
+
+**File:** frontend/src/features/dashboard/DashboardPage.tsx:28-36; frontend/src/features/dashboard/hooks.ts:4-9
+**Found:** 2026-09-26 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `useDashboard()` reads only `data`/`isLoading` from `useQuery`. `DashboardPage` shows a loading line while `isLoading`, then `if (!data) return null` when the query has settled with no data, which is exactly the error case (a 403 for an admin whose `/me` still lists a revoked `dashboard` permission, see F-11; a 5xx; or a network failure). The admin sees a blank page under `Dashboard` in the nav with no heading and no message at all, which is a more visible regression of the same fail-silent pattern already tracked nine times in this ledger (F-10, F-20, F-24, F-34, F-36, F-41, F-44, F-57, F-61): those pages at least keep their heading and empty-state UI on error, this one renders literally nothing.
+**Suggested fix:** Destructure `isError`/`error` from `useDashboard()` and render an inline `getGenericErrorMessage(error)` (with the page heading still shown) when the query fails, instead of returning `null`. Current requirement lost: None.
+**Resolution:**

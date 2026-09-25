@@ -11,6 +11,7 @@ import { AdminBookingDetailPage } from '@/features/admin-bookings/AdminBookingDe
 import { AdminBookingsPage } from '@/features/admin-bookings/AdminBookingsPage'
 import { WalkInBookingPage } from '@/features/admin-bookings/WalkInBookingPage'
 import { PaymentsListPage } from '@/features/admin-payments/PaymentsListPage'
+import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { BookingDetailPage } from '@/features/bookings/BookingDetailPage'
 import { BookingTypePage } from '@/features/bookings/BookingTypePage'
 import { MyBookingsPage } from '@/features/bookings/MyBookingsPage'
@@ -73,6 +74,10 @@ function App() {
 
           <Route element={<RoleRoute allow={['admin', 'super_admin']} requireModule="payments" />}>
             <Route path="/admin/payments" element={<PaymentsListPage />} />
+          </Route>
+
+          <Route element={<RoleRoute allow={['admin', 'super_admin']} requireModule="dashboard" />}>
+            <Route path="/admin/dashboard" element={<DashboardPage />} />
           </Route>
         </Route>
       </Route>

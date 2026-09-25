@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Admin\AdminAccountController;
 use App\Http\Controllers\Api\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Api\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Api\Admin\BookingPaymentController;
+use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Admin\InventoryController as AdminInventoryController;
 use App\Http\Controllers\Api\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\Admin\ServiceController as AdminServiceController;
@@ -64,6 +65,10 @@ Route::prefix('v1')->group(function () {
         Route::middleware(['auth:sanctum', 'role:admin,super_admin', 'module:payments'])->group(function () {
             Route::get('/payments', [AdminPaymentController::class, 'index']);
             Route::post('/bookings/{id}/payments', [BookingPaymentController::class, 'store'])->where('id', '[0-9]{1,18}');
+        });
+
+        Route::middleware(['auth:sanctum', 'role:admin,super_admin', 'module:dashboard'])->group(function () {
+            Route::get('/dashboard', [AdminDashboardController::class, 'index']);
         });
     });
 
