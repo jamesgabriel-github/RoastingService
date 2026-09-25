@@ -51,3 +51,15 @@ export async function weighInBooking(id: number, payload: WeighInPayload): Promi
   const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/weigh-in`, payload)
   return data
 }
+
+export async function confirmOrder(id: number): Promise<AdminBooking> {
+  await ensureCsrfCookie()
+  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/confirm-order`)
+  return data
+}
+
+export async function rejectOrder(id: number, payload: RejectPayload): Promise<AdminBooking> {
+  await ensureCsrfCookie()
+  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/reject-order`, payload)
+  return data
+}

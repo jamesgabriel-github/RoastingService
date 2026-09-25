@@ -2,10 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ApprovePayload, RejectPayload, WeighInPayload } from './api'
 import {
   approveBooking,
+  confirmOrder,
   fetchAdminBookingDetail,
   fetchAdminBookings,
   fetchBookingCounts,
   rejectBooking,
+  rejectOrder,
   weighInBooking,
 } from './api'
 import type { QueueStatus } from './types'
@@ -64,6 +66,24 @@ export function useWeighInBooking() {
 
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: WeighInPayload }) => weighInBooking(id, payload),
+    onSuccess: (_data, { id }) => invalidate(id),
+  })
+}
+
+export function useConfirmOrder() {
+  const invalidate = useBookingActionInvalidation()
+
+  return useMutation({
+    mutationFn: (id: number) => confirmOrder(id),
+    onSuccess: (_data, id) => invalidate(id),
+  })
+}
+
+export function useRejectOrder() {
+  const invalidate = useBookingActionInvalidation()
+
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: RejectPayload }) => rejectOrder(id, payload),
     onSuccess: (_data, { id }) => invalidate(id),
   })
 }

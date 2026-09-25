@@ -45,6 +45,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/bookings/{id}/approve', [AdminBookingController::class, 'approve'])->where('id', '[0-9]{1,18}');
             Route::post('/bookings/{id}/reject', [AdminBookingController::class, 'reject'])->where('id', '[0-9]{1,18}');
             Route::post('/bookings/{id}/weigh-in', [AdminBookingController::class, 'weighIn'])->where('id', '[0-9]{1,18}');
+            Route::post('/bookings/{id}/confirm-order', [AdminBookingController::class, 'confirmOrder'])->where('id', '[0-9]{1,18}');
+            Route::post('/bookings/{id}/reject-order', [AdminBookingController::class, 'rejectOrder'])->where('id', '[0-9]{1,18}');
         });
     });
 

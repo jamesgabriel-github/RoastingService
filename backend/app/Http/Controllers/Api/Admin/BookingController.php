@@ -9,6 +9,8 @@ use App\Http\Requests\Admin\WeighInBookingRequest;
 use App\Http\Resources\AdminBookingResource;
 use App\Models\Booking;
 use App\Models\BookingStatusLog;
+use App\Models\InventoryLog;
+use App\Models\Service;
 use App\Services\Booking\BookingStatusEngine;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -165,6 +167,57 @@ class BookingController extends Controller
         return new AdminBookingResource($booking->load(self::detailEagerLoads()));
     }
 
+    public function confirmOrder(Request $request, BookingStatusEngine $statusEngine, int $id): AdminBookingResource
+    {
+        $booking = DB::transaction(function () use ($request, $statusEngine, $id) {
+            $booking = Booking::lockForUpdate()->findOrFail($id);
+
+            $this->guardOrderTransition($booking, $statusEngine, 'confirmed', 'confirmed');
+
+            $booking->confirmed_at = now();
+            $booking->confirmed_by = $request->user()->id;
+            $booking->save();
+
+            $statusEngine->transition($booking, 'confirmed', $request->user()->id);
+
+            return $booking;
+        });
+
+        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+    }
+
+    public function rejectOrder(RejectBookingRequest $request, BookingStatusEngine $statusEngine, int $id): AdminBookingResource
+    {
+        $booking = DB::transaction(function () use ($request, $statusEngine, $id) {
+            $booking = Booking::with('items')->lockForUpdate()->findOrFail($id);
+
+            $this->guardOrderTransition($booking, $statusEngine, 'rejected', 'rejected');
+
+            $reason = $request->validated('reason');
+
+            $booking->reject_reason = $reason;
+            $booking->save();
+
+            foreach ($booking->items as $item) {
+                Service::whereKey($item->service_id)->increment('stock_qty', $item->qty);
+
+                InventoryLog::create([
+                    'service_id' => $item->service_id,
+                    'change_qty' => $item->qty,
+                    'reason' => 'release',
+                    'booking_id' => $booking->id,
+                    'created_by' => $request->user()->id,
+                ]);
+            }
+
+            $statusEngine->transition($booking, 'rejected', $request->user()->id, $reason);
+
+            return $booking;
+        });
+
+        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+    }
+
     /**
      * Approve, reject, and weigh-in are only for bring-your-own bookings - a
      * shop-supplied order reaches `rejected`/`confirmed` through feature 11's
@@ -176,6 +229,22 @@ class BookingController extends Controller
     {
         if (
             $booking->source_type !== 'customer_supplied'
+            || ! $statusEngine->isAllowed($booking->source_type, $booking->status, $to)
+        ) {
+            throw ValidationException::withMessages([
+                'status' => "This booking cannot be {$action} right now.",
+            ]);
+        }
+    }
+
+    /**
+     * Confirm and reject-order are only for shop-supplied bookings - the
+     * bring-your-own counterpart is `guardTransition` above.
+     */
+    private function guardOrderTransition(Booking $booking, BookingStatusEngine $statusEngine, string $to, string $action): void
+    {
+        if (
+            $booking->source_type !== 'shop_supplied'
             || ! $statusEngine->isAllowed($booking->source_type, $booking->status, $to)
         ) {
             throw ValidationException::withMessages([

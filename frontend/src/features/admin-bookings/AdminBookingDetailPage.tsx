@@ -6,7 +6,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatCurrency } from '@/lib/currency'
 import { getGenericErrorMessage } from '@/lib/errors'
-import { useAdminBookingDetail, useApproveBooking, useRejectBooking, useWeighInBooking } from './hooks'
+import {
+  useAdminBookingDetail,
+  useApproveBooking,
+  useConfirmOrder,
+  useRejectBooking,
+  useRejectOrder,
+  useWeighInBooking,
+} from './hooks'
 import type { AdminBooking } from './types'
 
 function getActionErrorMessage(error: unknown): string {
@@ -75,6 +82,53 @@ function ApproveRejectActions({ booking }: { booking: AdminBooking }) {
         <Label htmlFor="reject_reason">Reject reason</Label>
         <div className="flex gap-2">
           <Input id="reject_reason" value={reason} onChange={(event) => setReason(event.target.value)} />
+          <Button variant="outline" disabled={isSaving} onClick={onReject}>
+            Reject
+          </Button>
+        </div>
+      </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  )
+}
+
+function ConfirmRejectOrderActions({ booking }: { booking: AdminBooking }) {
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const confirm = useConfirmOrder()
+  const reject = useRejectOrder()
+  const isSaving = confirm.isPending || reject.isPending
+
+  const onConfirm = () => {
+    setError(null)
+    confirm.mutate(booking.id, { onError: (err) => setError(getActionErrorMessage(err)) })
+  }
+
+  const onReject = () => {
+    if (!reason.trim()) {
+      setError('Enter a reason for rejecting this order.')
+      return
+    }
+    setError(null)
+    reject.mutate(
+      { id: booking.id, payload: { reason: reason.trim() } },
+      { onError: (err) => setError(getActionErrorMessage(err)) }
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3">
+      <h2 className="font-semibold">Actions</h2>
+
+      <Button disabled={isSaving} onClick={onConfirm}>
+        Confirm order
+      </Button>
+
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="reject_order_reason">Reject reason</Label>
+        <div className="flex gap-2">
+          <Input id="reject_order_reason" value={reason} onChange={(event) => setReason(event.target.value)} />
           <Button variant="outline" disabled={isSaving} onClick={onReject}>
             Reject
           </Button>
@@ -182,6 +236,7 @@ export function AdminBookingDetailPage() {
 
       {isRoasting && booking.status === 'pending_review' && <ApproveRejectActions booking={booking} />}
       {isRoasting && booking.status === 'approved' && <WeighInActions booking={booking} />}
+      {!isRoasting && booking.status === 'pending_confirmation' && <ConfirmRejectOrderActions booking={booking} />}
 
       <div className="flex flex-col gap-2 rounded-lg border p-3">
         <h2 className="font-semibold">Status timeline</h2>
