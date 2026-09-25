@@ -33,5 +33,5 @@ Replace these examples with your own features:
 - [x] 13. **Walk-in bookings** - admin creates either booking type for a registered customer or a guest (name + phone), with instant weigh-in when the food is on hand
 - [x] 14. **Payments** - admin records full payments (cash, GCash, card) against confirmed bookings, with paid vs balance shown on the booking and a filterable payments list
 - [x] 15. **Sales dashboard** - sales today/week/month from payments split by booking type, bookings by status, today's cooking/ready queue, top items and low-stock alerts
-- [ ] 16. **Public landing page** - hero with Book Now, about, services cards with rates and cook times, how it works, and location/contact
+- [x] 16. **Public landing page** - hero with Book Now, about, services cards with rates and cook times, how it works, and location/contact
 

@@ -17,6 +17,7 @@ import { BookingTypePage } from '@/features/bookings/BookingTypePage'
 import { MyBookingsPage } from '@/features/bookings/MyBookingsPage'
 import { NewBookingPage } from '@/features/bookings/NewBookingPage'
 import { InventoryPage } from '@/features/inventory/InventoryPage'
+import { LandingPage } from '@/features/landing/LandingPage'
 import { NewShopOrderPage } from '@/features/orders/NewShopOrderPage'
 import { ServicesPage } from '@/features/services/ServicesPage'
 import { ProfileSetupRoute } from '@/routes/ProfileSetupRoute'
@@ -27,7 +28,7 @@ function App() {
   return (
     <Routes>
       <Route element={<PublicLayout />}>
-        <Route path="/" element={<div>Roasting Service</div>} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
       </Route>
 
