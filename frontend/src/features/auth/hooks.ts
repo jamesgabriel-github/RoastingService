@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { adminLogin, adminLogout, fetchMe, loginCustomer, logout, registerCustomer } from './api'
+import {
+  adminLogin,
+  adminLogout,
+  completeProfile,
+  fetchMe,
+  loginCustomer,
+  logout,
+} from './api'
 
 export function useMe() {
   return useQuery({
@@ -9,24 +16,24 @@ export function useMe() {
   })
 }
 
-export function useRegister() {
+export function useLoginCustomer() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: registerCustomer,
+    mutationFn: loginCustomer,
     onSuccess: (me) => {
       queryClient.setQueryData(['me'], me)
     },
   })
 }
 
-export function useLoginCustomer() {
+export function useCompleteProfile() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: loginCustomer,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['me'] })
+    mutationFn: completeProfile,
+    onSuccess: (me) => {
+      queryClient.setQueryData(['me'], me)
     },
   })
 }

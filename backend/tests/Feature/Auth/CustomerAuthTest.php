@@ -17,113 +17,18 @@ class CustomerAuthTest extends TestCase
         $this->withHeader('Referer', 'http://localhost:5173');
     }
 
-    public function test_customer_can_register(): void
-    {
-        $response = $this->postJson('/api/v1/register', [
-            'name' => 'Juan Dela Cruz',
-            'email' => 'juan@example.com',
-            'phone' => '09171234567',
-            'password' => 'password123',
-        ]);
-
-        $response->assertCreated();
-        $response->assertJson([
-            'name' => 'Juan Dela Cruz',
-            'email' => 'juan@example.com',
-            'phone' => '09171234567',
-            'role' => 'customer',
-            'permissions' => [],
-        ]);
-        $this->assertDatabaseHas('users', [
-            'email' => 'juan@example.com',
-            'phone' => '09171234567',
-            'role' => 'customer',
-        ]);
-        $this->assertAuthenticated('web');
-    }
-
-    public function test_registration_normalizes_intl_phone_format(): void
-    {
-        $this->postJson('/api/v1/register', [
-            'name' => 'Juan Dela Cruz',
-            'email' => 'juan@example.com',
-            'phone' => '+639171234567',
-            'password' => 'password123',
-        ])->assertCreated();
-
-        $this->assertDatabaseHas('users', ['phone' => '09171234567']);
-    }
-
-    public function test_registration_rejects_invalid_phone_format(): void
-    {
-        $response = $this->postJson('/api/v1/register', [
-            'name' => 'Juan Dela Cruz',
-            'email' => 'juan@example.com',
-            'phone' => '12345',
-            'password' => 'password123',
-        ]);
-
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors('phone');
-    }
-
-    public function test_registration_rejects_duplicate_email(): void
-    {
-        User::factory()->create(['email' => 'juan@example.com']);
-
-        $response = $this->postJson('/api/v1/register', [
-            'name' => 'Juan Dela Cruz',
-            'email' => 'juan@example.com',
-            'phone' => '09171234567',
-            'password' => 'password123',
-        ]);
-
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors('email');
-    }
-
-    public function test_registration_rejects_duplicate_email_case_insensitively(): void
-    {
-        $this->postJson('/api/v1/register', [
-            'name' => 'Juan Dela Cruz',
-            'email' => 'Juan@example.com',
-            'phone' => '09171234567',
-            'password' => 'password123',
-        ])->assertCreated();
-
-        $response = $this->postJson('/api/v1/register', [
-            'name' => 'Another Juan',
-            'email' => 'juan@example.com',
-            'phone' => '09179876543',
-            'password' => 'password123',
-        ]);
-
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors('email');
-    }
-
-    public function test_registration_rejects_duplicate_phone(): void
-    {
-        User::factory()->create(['phone' => '09171234567']);
-
-        $response = $this->postJson('/api/v1/register', [
-            'name' => 'Juan Dela Cruz',
-            'email' => 'juan@example.com',
-            'phone' => '09171234567',
-            'password' => 'password123',
-        ]);
-
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors('phone');
-    }
-
     public function test_customer_can_log_in_with_registered_phone(): void
     {
         $customer = User::factory()->create(['phone' => '09171234567']);
 
         $response = $this->postJson('/api/v1/login', ['phone' => '09171234567']);
 
-        $response->assertNoContent();
+        $response->assertOk();
+        $response->assertJson([
+            'id' => $customer->id,
+            'phone' => '09171234567',
+            'role' => 'customer',
+        ]);
         $this->assertAuthenticatedAs($customer, 'web');
     }
 
@@ -133,16 +38,41 @@ class CustomerAuthTest extends TestCase
 
         $response = $this->postJson('/api/v1/login', ['phone' => '+639171234567']);
 
-        $response->assertNoContent();
+        $response->assertOk();
+        $response->assertJson(['id' => $customer->id]);
         $this->assertAuthenticatedAs($customer, 'web');
     }
 
-    public function test_login_rejects_unknown_phone(): void
+    public function test_login_auto_creates_customer_for_unknown_phone(): void
     {
         $response = $this->postJson('/api/v1/login', ['phone' => '09171234567']);
 
-        $response->assertUnprocessable();
-        $this->assertGuest('web');
+        $response->assertOk();
+        $response->assertJson([
+            'phone' => '09171234567',
+            'role' => 'customer',
+            'is_active' => true,
+            'first_name' => null,
+            'last_name' => null,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'phone' => '09171234567',
+            'role' => 'customer',
+            'is_active' => true,
+        ]);
+        $this->assertAuthenticated('web');
+    }
+
+    public function test_login_auto_creates_customer_with_intl_phone_format(): void
+    {
+        $response = $this->postJson('/api/v1/login', ['phone' => '+639171234567']);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('users', [
+            'phone' => '09171234567',
+            'role' => 'customer',
+        ]);
+        $this->assertAuthenticated('web');
     }
 
     public function test_login_rejects_admin_phone(): void
@@ -169,7 +99,7 @@ class CustomerAuthTest extends TestCase
     {
         $customer = User::factory()->create(['phone' => '09171234567']);
 
-        $this->postJson('/api/v1/login', ['phone' => '09171234567'])->assertNoContent();
+        $this->postJson('/api/v1/login', ['phone' => '09171234567'])->assertOk();
 
         $response = $this->postJson('/api/v1/logout');
 

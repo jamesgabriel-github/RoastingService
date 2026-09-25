@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\AdminAccountController;
 use App\Http\Controllers\Api\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Api\Customer\AuthController as CustomerAuthController;
+use App\Http\Controllers\Api\Customer\ProfileController;
 use App\Http\Controllers\Api\MeController;
 use Illuminate\Support\Facades\Route;
 
@@ -18,9 +19,9 @@ Route::prefix('v1')->group(function () {
         });
     });
 
-    Route::post('/register', [CustomerAuthController::class, 'register'])->middleware('throttle:6,1');
     Route::post('/login', [CustomerAuthController::class, 'login'])->middleware('throttle:6,1');
     Route::post('/logout', [CustomerAuthController::class, 'logout'])->middleware('auth:sanctum');
+    Route::post('/profile/complete', [ProfileController::class, 'complete'])->middleware('auth:sanctum');
 
     Route::get('/me', MeController::class)->middleware('auth:sanctum');
 });

@@ -36,7 +36,7 @@ monitor sales.
 | **Customer** | Book a roasting service or order from the shop, choose pickup or delivery, see estimated/final price, track status |
 | **Admin (shop staff)** | Review and confirm bookings, weigh in raw food, update cooking status, manage services and inventory, add walk-ins, record payments, monitor sales - scoped to whichever modules they've been granted |
 | **Super admin (shop owner/manager)** | Everything a regular admin can do, plus create/enable/disable admin accounts and assign each one's per-module permissions |
-| **Visitor (public)** | Learn about the shop, services, prices and how booking works, then register |
+| **Visitor (public)** | Learn about the shop, services, prices and how booking works, then log in, which creates their account automatically on first use |
 
 ## 3. Features - What does the MVP need?
 
@@ -78,7 +78,8 @@ Exits: Rejected / Cancelled -> stock released
 - Services with rates, prices and cook times (1-3 hrs)
 - How it works
 - Location / contact
-- Login / register
+- Login (no separate register step; an unrecognized number registers
+  automatically on first login)
 
 ### Customer
 
@@ -89,7 +90,9 @@ Exits: Rejected / Cancelled -> stock released
   - Pickup or delivery (address, contact number), notes
 - **My bookings:** list + detail with status timeline, estimated vs final
   weight/price, estimated ready time
-- **Profile:** name, email, contact number, password
+- **Profile:** first name, middle name (optional), last name, address -
+  collected during first-login profile setup, not a separate sign-up; contact
+  number is the login identity, set at account creation, not editable here
 
 ### Admin
 
@@ -132,9 +135,15 @@ Exits: Rejected / Cancelled -> stock released
 8. Customer login is by **mobile number only** in v1 - no password, no code,
    just the registered number. This is a deliberate v1 simplification, not an
    oversight: it means anyone who knows a customer's registered mobile number
-   can access that account until v2's SMS verification ships. Customer
-   sign-up still collects full personal information (name, email, phone) as
-   before; only the login step is simplified.
+   can access that account until v2's SMS verification ships. There is no
+   separate customer sign-up: logging in with a phone number that doesn't
+   match any existing customer silently creates a new customer account for
+   that number, extending the same trust model to account creation. The
+   first time a customer's profile is incomplete (no name saved yet), they
+   are routed to a profile-setup step before reaching their account - first
+   name, middle name (optional), last name, and a single free-text address.
+   Customers have no email or password; only admins authenticate with email
+   + password (rule 7).
 9. Two admin tiers: **super admin** and **admin**. Only a super admin can
    create, enable/disable, or change the permissions of an admin account.
    A disabled admin account can't log in even with correct credentials. A
@@ -157,8 +166,11 @@ Exits: Rejected / Cancelled -> stock released
 ## 4. Data - What are we storing?
 
 ### `users`
-id, name, email, phone, password, role (`super_admin` | `admin` | `customer`),
-is_active (default true), timestamps
+id, name (nullable, admin/super admin only), email (nullable, unique,
+admin/super admin only), phone (nullable, unique), password (nullable,
+admin/super admin only), first_name (nullable), middle_name (nullable),
+last_name (nullable), address (nullable, free text), role (`super_admin` |
+`admin` | `customer`), is_active (default true), timestamps
 
 ### `admin_permissions`
 id, user_id (-> `users`, an `admin` row), module (`services` | `inventory` |
@@ -173,11 +185,14 @@ admin who granted it), timestamps
 > a row for. `approved_by`, `confirmed_by`, `created_by`, `recorded_by`, and
 > `changed_by` below are normal `users.id` FKs pointing at the acting admin.
 >
-> Customer rows (`role = customer`) log in with **mobile number only** in v1
-> - `password` is collected at sign-up but not checked at login yet. v2 adds
-> an SMS one-time code sent to that number (see Not in v1); whether that code
-> lives in a new table or an ephemeral cache entry is a `/feature`-time
-> implementation decision, not fixed here.
+> Customer rows (`role = customer`) have no `password`, `email`, or `name` -
+> those columns exist only for admin/super-admin rows. A customer logs in
+> with **mobile number only** in v1; an unrecognized number silently creates
+> a new customer row with `first_name`/`middle_name`/`last_name`/`address`
+> all null until profile setup. v2 adds an SMS one-time code sent to that
+> number before granting access or creating the account (see Not in v1);
+> whether that code lives in a new table or an ephemeral cache entry remains
+> a `/feature`-time implementation decision.
 
 ### `services`
 id, name, description, roasting_rate_per_kg (nullable), shop_price (nullable,
@@ -234,10 +249,12 @@ key, value - e.g. `downpayment_enabled` (false), `downpayment_percent` (25)
   still a normal email + password check against a `users` row (`role =
   admin` or `super_admin`); no public admin signup, only a super admin
   creates other admin accounts. `is_active = false` blocks login outright.
-- **Customer login** in v1 only asks for a mobile number - no password check.
-  v2 adds SMS one-time-code verification to that number (e.g. via Semaphore)
-  before granting the session; sign-up still collects full customer details
-  regardless of the login method.
+- **Customer login** in v1 only asks for a mobile number - no password check,
+  and no separate sign-up: an unrecognized number silently creates the
+  customer account. A first login with an incomplete profile (no name saved)
+  is routed to a profile-setup step (first/middle/last name, address) before
+  the account page. v2 adds SMS one-time-code verification before granting
+  the session or creating the account, closing this v1 gap for both.
 - **Roles & permissions:** `role` column (`super_admin` | `admin` |
   `customer`) plus middleware/policies for admin vs customer routes. Within
   admin, per-module access (Services, Inventory, Bookings, Payments,

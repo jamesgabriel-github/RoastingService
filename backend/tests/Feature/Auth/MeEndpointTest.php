@@ -26,7 +26,7 @@ class MeEndpointTest extends TestCase
     public function test_customer_sees_own_profile_and_no_permissions(): void
     {
         $customer = User::factory()->create();
-        $this->postJson('/api/v1/login', ['phone' => $customer->phone])->assertNoContent();
+        $this->postJson('/api/v1/login', ['phone' => $customer->phone])->assertOk();
 
         $response = $this->getJson('/api/v1/me');
 

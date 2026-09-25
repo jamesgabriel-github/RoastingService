@@ -14,22 +14,23 @@ export async function fetchMe(): Promise<Me | null> {
   }
 }
 
-export interface RegisterPayload {
-  name: string
-  email: string
-  phone: string
-  password: string
-}
-
-export async function registerCustomer(payload: RegisterPayload): Promise<Me> {
+export async function loginCustomer(phone: string): Promise<Me> {
   await ensureCsrfCookie()
-  const { data } = await api.post<Me>('/register', payload)
+  const { data } = await api.post<Me>('/login', { phone })
   return data
 }
 
-export async function loginCustomer(phone: string): Promise<void> {
+export interface CompleteProfilePayload {
+  first_name: string
+  middle_name?: string
+  last_name: string
+  address: string
+}
+
+export async function completeProfile(payload: CompleteProfilePayload): Promise<Me> {
   await ensureCsrfCookie()
-  await api.post('/login', { phone })
+  const { data } = await api.post<Me>('/profile/complete', payload)
+  return data
 }
 
 export async function adminLogin(email: string, password: string): Promise<void> {

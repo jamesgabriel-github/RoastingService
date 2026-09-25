@@ -9,7 +9,6 @@ export function PublicLayout() {
         </Link>
         <nav className="flex gap-4 text-sm">
           <Link to="/login">Log in</Link>
-          <Link to="/register">Register</Link>
         </nav>
       </header>
       <main className="p-4">

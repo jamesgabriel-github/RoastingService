@@ -19,18 +19,19 @@ Start with your first real slice of functionality.
 Replace these examples with your own features:
 
 - [x] 1. **Auth & roles** - separate `/admin` login (email + password, seeded accounts, no public signup) and customer auth (sign-up collects full profile info; v1 login is mobile-number-only with no password check, v2 adds an SMS one-time code); two admin tiers - super admin creates/enables/disables admin accounts and assigns each one per-module permissions (services, inventory, bookings, payments, dashboard), a regular admin is restricted to their assigned modules; Sanctum SPA cookies for both, role-based middleware and layouts
-- [ ] 2. **Customer profile** - customer views and edits name, email and phone (PH mobile format), and changes password
-- [ ] 3. **Services management** - admin creates, edits and deactivates roastable/sellable items with roasting rate per kg, shop price per piece, cook time and allowed booking types; public active-services endpoint
-- [ ] 4. **Inventory** - admin restocks and adjusts shop stock per piece inside locked transactions, with a full inventory log and low-stock indicator
-- [ ] 5. **Bring-your-own booking** - customer books roasting for their own raw food (estimated raw kg, preferred drop-off, pickup/delivery) and sees a server-calculated estimate; introduces the booking status engine, rate snapshots and status logs
-- [ ] 6. **Shop order** - customer orders in-stock items per piece with pickup/delivery; stock is reserved atomically with the order and the total is final
-- [ ] 7. **My bookings** - customer list and detail with status timeline, estimated vs final weight and price, auto-refresh, and cancel before cooking
-- [ ] 8. **Admin booking queues** - tabbed status queues with counts, search by code/name/phone, waiting time, and a booking detail view
-- [ ] 9. **Approve & weigh-in** - admin approves bring-your-own bookings with a drop-off schedule or rejects with a reason, then weighs in the raw food to lock the final price and confirm
-- [ ] 10. **Shop order confirmation** - admin confirms shop orders as final or rejects them with a reason, releasing reserved stock
-- [ ] 11. **Cooking & fulfillment** - admin starts cooking (sets estimated ready time), marks ready for pickup or out for delivery, completes, and handles no-shows and cancellations with stock release
-- [ ] 12. **Walk-in bookings** - admin creates either booking type for a registered customer or a guest (name + phone), with instant weigh-in when the food is on hand
-- [ ] 13. **Payments** - admin records full payments (cash, GCash, card) against confirmed bookings, with paid vs balance shown on the booking and a filterable payments list
-- [ ] 14. **Sales dashboard** - sales today/week/month from payments split by booking type, bookings by status, today's cooking/ready queue, top items and low-stock alerts
-- [ ] 15. **Public landing page** - hero with Book Now, about, services cards with rates and cook times, how it works, and location/contact
+- [x] 2. **Customer identity & profile setup** - remove email/password from customer registration and the standalone registration page; customer login on an unrecognized phone number silently creates the account (same v1 no-verification trust model as login itself; v2's OTP closes this gap for creation too); a customer with no name saved yet is routed to a profile-setup step (first name, optional middle name, last name, single free-text address) before reaching their account page
+- [ ] 3. **Customer profile** - customer views and edits first, middle and last name and their address (email and password no longer exist for customers; phone is the login identity, not editable here)
+- [ ] 4. **Services management** - admin creates, edits and deactivates roastable/sellable items with roasting rate per kg, shop price per piece, cook time and allowed booking types; public active-services endpoint
+- [ ] 5. **Inventory** - admin restocks and adjusts shop stock per piece inside locked transactions, with a full inventory log and low-stock indicator
+- [ ] 6. **Bring-your-own booking** - customer books roasting for their own raw food (estimated raw kg, preferred drop-off, pickup/delivery) and sees a server-calculated estimate; introduces the booking status engine, rate snapshots and status logs
+- [ ] 7. **Shop order** - customer orders in-stock items per piece with pickup/delivery; stock is reserved atomically with the order and the total is final
+- [ ] 8. **My bookings** - customer list and detail with status timeline, estimated vs final weight and price, auto-refresh, and cancel before cooking
+- [ ] 9. **Admin booking queues** - tabbed status queues with counts, search by code/name/phone, waiting time, and a booking detail view
+- [ ] 10. **Approve & weigh-in** - admin approves bring-your-own bookings with a drop-off schedule or rejects with a reason, then weighs in the raw food to lock the final price and confirm
+- [ ] 11. **Shop order confirmation** - admin confirms shop orders as final or rejects them with a reason, releasing reserved stock
+- [ ] 12. **Cooking & fulfillment** - admin starts cooking (sets estimated ready time), marks ready for pickup or out for delivery, completes, and handles no-shows and cancellations with stock release
+- [ ] 13. **Walk-in bookings** - admin creates either booking type for a registered customer or a guest (name + phone), with instant weigh-in when the food is on hand
+- [ ] 14. **Payments** - admin records full payments (cash, GCash, card) against confirmed bookings, with paid vs balance shown on the booking and a filterable payments list
+- [ ] 15. **Sales dashboard** - sales today/week/month from payments split by booking type, bookings by status, today's cooking/ready queue, top items and low-stock alerts
+- [ ] 16. **Public landing page** - hero with Book Now, about, services cards with rates and cook times, how it works, and location/contact
 

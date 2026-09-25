@@ -5,8 +5,9 @@ import { PublicLayout } from '@/components/layouts/PublicLayout'
 import { AccountPage } from '@/features/auth/AccountPage'
 import { AdminLoginPage } from '@/features/auth/AdminLoginPage'
 import { LoginPage } from '@/features/auth/LoginPage'
-import { RegisterPage } from '@/features/auth/RegisterPage'
+import { ProfileSetupPage } from '@/features/auth/ProfileSetupPage'
 import { AdminAccountsPage } from '@/features/admin-accounts/AdminAccountsPage'
+import { ProfileSetupRoute } from '@/routes/ProfileSetupRoute'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
 import { RoleRoute } from '@/routes/RoleRoute'
 
@@ -16,7 +17,12 @@ function App() {
       <Route element={<PublicLayout />}>
         <Route path="/" element={<div>Roasting Service</div>} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+      </Route>
+
+      <Route element={<ProfileSetupRoute />}>
+        <Route element={<CustomerLayout />}>
+          <Route path="/profile-setup" element={<ProfileSetupPage />} />
+        </Route>
       </Route>
 
       <Route element={<ProtectedRoute />}>

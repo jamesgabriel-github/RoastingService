@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { getGenericErrorMessage } from '@/lib/errors'
 import { useLoginCustomer, useMe } from './hooks'
 import { PH_PHONE_REGEX } from './phone'
+import { isProfileComplete } from './profile'
 
 const loginSchema = z.object({
   phone: z.string().regex(PH_PHONE_REGEX, 'Enter a valid PH mobile number'),
@@ -31,13 +32,13 @@ export function LoginPage() {
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) })
 
   if (!meLoading && me?.role === 'customer') {
-    return <Navigate to="/account" replace />
+    return <Navigate to={isProfileComplete(me) ? '/account' : '/profile-setup'} replace />
   }
 
   const onSubmit = handleSubmit(({ phone }) => {
     setFormError(null)
     login.mutate(phone, {
-      onSuccess: () => navigate('/account'),
+      onSuccess: (me) => navigate(isProfileComplete(me) ? '/account' : '/profile-setup'),
       onError: (error) => {
         if (isAxiosError(error) && error.response?.status === 422) {
           setError('phone', { message: 'We could not find an account with that number.' })
