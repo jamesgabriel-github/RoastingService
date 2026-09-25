@@ -142,3 +142,19 @@
 **Why it matters:** `useBookableServices()` reads only `data` and `isLoading`. If `GET /api/v1/services` fails (a 5xx or a network error), the page renders an item dropdown with only "Select an item". There is no message, so the customer cannot book and is not told why. The coding standards say to surface errors rather than fail silently. This is the F-10/F-20/F-24 pattern on the first customer-facing form. The submit mutation surfaces errors correctly.
 **Suggested fix:** Destructure `isError`/`error` from `useBookableServices()` and render an inline `getGenericErrorMessage(error)` in the Items section when the query fails. Current requirement lost: None.
 **Resolution:**
+
+### F-36 [P3] open - Shop order form's services query fails silently
+
+**File:** frontend/src/features/orders/NewShopOrderPage.tsx:66
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `useShoppableServices()` reads only `data` and `isLoading`. If `GET /api/v1/services` fails, the item dropdown shows only "Select an item" with no message, so the customer cannot order and is not told why. The coding standards say to surface errors rather than fail silently. This repeats F-34 on the new feature's form.
+**Suggested fix:** Destructure `isError`/`error` from `useShoppableServices()` and render an inline `getGenericErrorMessage(error)` in the Items section when the query fails. Current requirement lost: None.
+**Resolution:**
+
+### F-37 [P3] open - No test covers duplicate-service lines reaching the order controller
+
+**File:** backend/tests/Feature/Customer/ShopOrderManagementTest.php:209
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: tests)
+**Why it matters:** The F-35 repair changed `OrderController::store` to decrement one shared in-memory `Service` per id and save each row once after the loop. The correctness of repeated lines (for example B, A, B) now depends on that shared instance. The only test with repeated `service_id`s is `test_more_than_twenty_items_is_rejected`, which fails Form Request validation (`max:20`) before the controller runs. No repo test proves that a second line sees the first line's decrement, or that duplicate lines together exceeding stock roll back the whole order. The F-35 note says existing tests covered this, but they do not. A reviewer probe confirmed the current behavior is correct, so this is a coverage gap, not a defect.
+**Suggested fix:** Add two feature tests: a successful order with lines B, A, B (assert both final `stock_qty` values, three `reserve` logs, and the total), and a duplicate-line order that exceeds stock (assert 422 on the later line's `qty` and no stock, log, or booking writes). Current requirement lost: None.
+**Resolution:**

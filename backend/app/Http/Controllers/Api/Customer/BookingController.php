@@ -7,17 +7,18 @@ use App\Http\Requests\Customer\StoreBookingRequest;
 use App\Http\Resources\BookingResource;
 use App\Models\Booking;
 use App\Models\Service;
+use App\Services\Booking\BookingCodeGenerator;
 use App\Services\Booking\BookingStatusEngine;
 use Illuminate\Support\Facades\DB;
 
 class BookingController extends Controller
 {
-    /** Arbitrary fixed key for the booking-code advisory lock (see Notes in the spec). */
-    private const CODE_LOCK_KEY = 918273645;
-
-    public function store(StoreBookingRequest $request, BookingStatusEngine $statusEngine): BookingResource
-    {
-        $booking = DB::transaction(function () use ($request, $statusEngine) {
+    public function store(
+        StoreBookingRequest $request,
+        BookingStatusEngine $statusEngine,
+        BookingCodeGenerator $codeGenerator
+    ): BookingResource {
+        $booking = DB::transaction(function () use ($request, $statusEngine, $codeGenerator) {
             $items = $request->validated('items');
             $services = Service::whereIn('id', array_column($items, 'service_id'))->get()->keyBy('id');
 
@@ -39,12 +40,8 @@ class BookingController extends Controller
                 ];
             }
 
-            DB::select('select pg_advisory_xact_lock(?)', [self::CODE_LOCK_KEY]);
-            $lastCode = Booking::orderByDesc('id')->value('code');
-            $nextNumber = $lastCode ? ((int) substr($lastCode, 3)) + 1 : 1;
-
             $booking = Booking::create([
-                'code' => 'RS-'.str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT),
+                'code' => $codeGenerator->next(),
                 'customer_id' => $request->user()->id,
                 'source_type' => 'customer_supplied',
                 'fulfillment' => $request->validated('fulfillment'),

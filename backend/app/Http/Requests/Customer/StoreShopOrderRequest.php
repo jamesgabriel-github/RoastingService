@@ -1,0 +1,41 @@
+<?php
+
+namespace App\Http\Requests\Customer;
+
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StoreShopOrderRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return $this->user()?->role === 'customer';
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1', 'max:20'],
+            'items.*.service_id' => [
+                'required',
+                'integer',
+                Rule::exists('services', 'id')->where(function ($query) {
+                    $query->where('allow_shop_supplied', true)->where('is_active', true);
+                }),
+            ],
+            'items.*.qty' => ['required', 'integer', 'min:1', 'max:1000'],
+            'fulfillment' => ['required', 'string', 'in:pickup,delivery'],
+            'delivery_address' => ['nullable', 'string', 'max:500', 'required_if:fulfillment,delivery'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ];
+    }
+}

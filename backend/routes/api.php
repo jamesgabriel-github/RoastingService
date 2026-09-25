@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Admin\InventoryController as AdminInventoryControll
 use App\Http\Controllers\Api\Admin\ServiceController as AdminServiceController;
 use App\Http\Controllers\Api\Customer\AuthController as CustomerAuthController;
 use App\Http\Controllers\Api\Customer\BookingController;
+use App\Http\Controllers\Api\Customer\OrderController;
 use App\Http\Controllers\Api\Customer\ProfileController;
 use App\Http\Controllers\Api\MeController;
 use App\Http\Controllers\Api\ServiceController;
@@ -43,6 +44,7 @@ Route::prefix('v1')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->middleware('auth:sanctum');
 
     Route::post('/bookings', [BookingController::class, 'store'])->middleware(['auth:sanctum', 'role:customer']);
+    Route::post('/orders', [OrderController::class, 'store'])->middleware(['auth:sanctum', 'role:customer']);
 
     Route::get('/me', MeController::class)->middleware('auth:sanctum');
 

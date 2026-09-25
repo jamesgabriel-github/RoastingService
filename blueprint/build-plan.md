@@ -24,7 +24,7 @@ Replace these examples with your own features:
 - [x] 4. **Services management** - admin creates, edits and deactivates roastable/sellable items with roasting rate per kg, shop price per piece, cook time and allowed booking types; public active-services endpoint
 - [x] 5. **Inventory** - admin restocks and adjusts shop stock per piece inside locked transactions, with a full inventory log and low-stock indicator
 - [x] 6. **Bring-your-own booking** - customer books roasting for their own raw food (estimated raw kg, preferred drop-off, pickup/delivery) and sees a server-calculated estimate; introduces the booking status engine, rate snapshots and status logs
-- [ ] 7. **Shop order** - customer orders in-stock items per piece with pickup/delivery; stock is reserved atomically with the order and the total is final
+- [x] 7. **Shop order** - customer orders in-stock items per piece with pickup/delivery; stock is reserved atomically with the order and the total is final
 - [ ] 8. **My bookings** - customer list and detail with status timeline, estimated vs final weight and price, auto-refresh, and cancel before cooking
 - [ ] 9. **Admin booking queues** - tabbed status queues with counts, search by code/name/phone, waiting time, and a booking detail view
 - [ ] 10. **Approve & weigh-in** - admin approves bring-your-own bookings with a drop-off schedule or rejects with a reason, then weighs in the raw food to lock the final price and confirm

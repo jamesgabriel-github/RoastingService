@@ -7,8 +7,10 @@ import { AdminLoginPage } from '@/features/auth/AdminLoginPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ProfileSetupPage } from '@/features/auth/ProfileSetupPage'
 import { AdminAccountsPage } from '@/features/admin-accounts/AdminAccountsPage'
+import { BookingTypePage } from '@/features/bookings/BookingTypePage'
 import { NewBookingPage } from '@/features/bookings/NewBookingPage'
 import { InventoryPage } from '@/features/inventory/InventoryPage'
+import { NewShopOrderPage } from '@/features/orders/NewShopOrderPage'
 import { ServicesPage } from '@/features/services/ServicesPage'
 import { ProfileSetupRoute } from '@/routes/ProfileSetupRoute'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
@@ -31,7 +33,9 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<CustomerLayout />}>
           <Route path="/account" element={<AccountPage />} />
-          <Route path="/book" element={<NewBookingPage />} />
+          <Route path="/book" element={<BookingTypePage />} />
+          <Route path="/book/roasting" element={<NewBookingPage />} />
+          <Route path="/book/shop" element={<NewShopOrderPage />} />
         </Route>
       </Route>
 
