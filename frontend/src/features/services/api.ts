@@ -9,6 +9,7 @@ export interface ServicePayload {
   allow_shop_supplied: boolean
   roasting_rate_per_kg: string | null
   shop_price: string | null
+  low_stock_threshold: number
 }
 
 export async function fetchServices(): Promise<Service[]> {

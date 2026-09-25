@@ -7,6 +7,7 @@ import { AdminLoginPage } from '@/features/auth/AdminLoginPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ProfileSetupPage } from '@/features/auth/ProfileSetupPage'
 import { AdminAccountsPage } from '@/features/admin-accounts/AdminAccountsPage'
+import { InventoryPage } from '@/features/inventory/InventoryPage'
 import { ServicesPage } from '@/features/services/ServicesPage'
 import { ProfileSetupRoute } from '@/routes/ProfileSetupRoute'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
@@ -44,6 +45,10 @@ function App() {
 
           <Route element={<RoleRoute allow={['admin', 'super_admin']} requireModule="services" />}>
             <Route path="/admin/services" element={<ServicesPage />} />
+          </Route>
+
+          <Route element={<RoleRoute allow={['admin', 'super_admin']} requireModule="inventory" />}>
+            <Route path="/admin/inventory" element={<InventoryPage />} />
           </Route>
         </Route>
       </Route>

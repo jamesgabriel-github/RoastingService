@@ -8,5 +8,7 @@ export interface Service {
   allow_customer_supplied: boolean
   allow_shop_supplied: boolean
   stock_qty: number
+  low_stock_threshold: number
+  is_low_stock: boolean
   is_active: boolean
 }

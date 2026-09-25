@@ -20,6 +20,7 @@ const serviceSchema = z
     allow_shop_supplied: z.boolean(),
     roasting_rate_per_kg: z.string().optional(),
     shop_price: z.string().optional(),
+    low_stock_threshold: z.number().int('Must be a whole number').min(0, 'Must be at least 0'),
   })
   .superRefine((values, ctx) => {
     if (!values.allow_customer_supplied && !values.allow_shop_supplied) {
@@ -55,6 +56,7 @@ const emptyValues: ServiceFormValues = {
   allow_shop_supplied: false,
   roasting_rate_per_kg: '',
   shop_price: '',
+  low_stock_threshold: 5,
 }
 
 function toFormValues(service: Service): ServiceFormValues {
@@ -66,6 +68,7 @@ function toFormValues(service: Service): ServiceFormValues {
     allow_shop_supplied: service.allow_shop_supplied,
     roasting_rate_per_kg: service.roasting_rate_per_kg ?? '',
     shop_price: service.shop_price ?? '',
+    low_stock_threshold: service.low_stock_threshold,
   }
 }
 
@@ -78,6 +81,7 @@ function toPayload(values: ServiceFormValues): ServicePayload {
     allow_shop_supplied: values.allow_shop_supplied,
     roasting_rate_per_kg: values.allow_customer_supplied ? (values.roasting_rate_per_kg ?? null) : null,
     shop_price: values.allow_shop_supplied ? (values.shop_price ?? null) : null,
+    low_stock_threshold: values.low_stock_threshold,
   }
 }
 
@@ -233,6 +237,18 @@ export function ServicesPage() {
           <Label htmlFor="est_minutes">Cook time (minutes)</Label>
           <Input id="est_minutes" type="number" {...register('est_minutes', { valueAsNumber: true })} />
           {errors.est_minutes && <p className="text-sm text-destructive">{errors.est_minutes.message}</p>}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="low_stock_threshold">Low-stock threshold</Label>
+          <Input
+            id="low_stock_threshold"
+            type="number"
+            {...register('low_stock_threshold', { valueAsNumber: true })}
+          />
+          {errors.low_stock_threshold && (
+            <p className="text-sm text-destructive">{errors.low_stock_threshold.message}</p>
+          )}
         </div>
 
         <label className="flex items-center gap-2 text-sm">

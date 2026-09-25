@@ -45,7 +45,7 @@
 **Found:** 2026-09-24 by /audit independent (scope: current; lens: security)
 **Why it matters:** `UserResource` rebuilds the permission list from `role` alone (all modules for `super_admin`, granted rows for `admin`). After the F-06 repair, `hasModulePermission()` returns false for a disabled user, but `GET /api/v1/me` (guarded only by `auth:sanctum`) still returns 200 with the full permission list for a disabled admin with a live session. `RoleRoute` then admits them to the admin shell. Backend admin routes still 403 through `EnsureRole`, so no data is exposed today. The risk is that later module UIs will trust `/me.permissions`, and the permission rule now lives in two places.
 **Suggested fix:** Derive the list from the primitive, for example `array_values(array_filter(User::MODULES, fn ($m) => $this->hasModulePermission($m)))`, or return `[]` when `! is_active`. Optionally add a `/me` test for a disabled admin.
-**Resolution:** Re-examined 2026-09-25 by /audit independent (Feature 2 review; scope: current; lens: security). Feature 2 added four new fields above the `permissions` match block, shifting it from line 28 to line 32; the permissions logic itself is unchanged. Still open. Re-examined 2026-09-25 by /audit independent (Feature 4 review; scope: current; lens: security). Feature 4's `RoleRoute requireModule` and the `AdminLayout` Services link now trust `/me.permissions`, so a disabled admin with a live session would see the Services nav link and page shell. The new backend `module:services` middleware uses `hasModulePermission()`, and `EnsureRole` still returns 403, so no service data or write is exposed. Severity unchanged. Still open.
+**Resolution:** Re-examined 2026-09-25 by /audit independent (Feature 2 review; scope: current; lens: security). Feature 2 added four new fields above the `permissions` match block, shifting it from line 28 to line 32; the permissions logic itself is unchanged. Still open. Re-examined 2026-09-25 by /audit independent (Feature 4 review; scope: current; lens: security). Feature 4's `RoleRoute requireModule` and the `AdminLayout` Services link now trust `/me.permissions`, so a disabled admin with a live session would see the Services nav link and page shell. The new backend `module:services` middleware uses `hasModulePermission()`, and `EnsureRole` still returns 403, so no service data or write is exposed. Severity unchanged. Still open. Re-examined 2026-09-25 by /audit independent (Feature 5 review; scope: current; lens: security). Feature 5's `/admin/inventory` `RoleRoute requireModule="inventory"` and the `AdminLayout` Inventory link also trust `/me.permissions`. The backend `module:inventory` middleware and `EnsureRole`'s `is_active` check still return 403, so no inventory data or stock change is exposed. Severity unchanged. Still open.
 
 ### F-14 [P3] open - Coding standards still name `php artisan test` as the backend test command
 
@@ -89,11 +89,11 @@
 
 ### F-20 [P3] open - Admin services list fails silently when the query errors
 
-**File:** frontend/src/features/services/ServicesPage.tsx:128
+**File:** frontend/src/features/services/ServicesPage.tsx:132
 **Found:** 2026-09-25 by /audit independent (scope: current; lens: quality)
 **Why it matters:** `useServices()` reads only `data` and `isLoading`. On a 403 (for example a disabled admin whose `/me` still lists permissions, see F-11), a 5xx, or a network failure, the page shows the heading and the create form with no table and no message. The coding standards say to surface errors rather than fail silently. This repeats the F-10 pattern in a new page.
 **Suggested fix:** Destructure `isError`/`error` and render an inline `getGenericErrorMessage(error)` when the query fails. Current requirement lost: None.
-**Resolution:**
+**Resolution:** Re-examined 2026-09-25 by /audit independent (Feature 5 review; scope: current; lens: quality). Feature 5 added the threshold field above the query, shifting `useServices()` from line 128 to line 132; the silent-failure path is unchanged. Still open.
 
 ### F-21 [P3] open - Service tests skip the update-path normalization, 404s, and permitted-admin update/toggle
 
@@ -101,4 +101,36 @@
 **Found:** 2026-09-25 by /audit independent (scope: current; lens: tests)
 **Why it matters:** The spec says the non-applicable rate/price is always stored as `null` on both `store()` and `update()`, and that `PUT` and `toggle` return `404` for a missing id. Only the create-path normalization is tested. No test switches an existing service from customer-supplied to shop-supplied via `PUT` and asserts the old rate is cleared, and no test covers a missing id. `test_admin_with_services_permission_can_manage_services` covers only create and list, although the spec's Step 2 says a permitted admin "can do the same" as a super admin. The code paths look correct on reading, so this is a coverage gap, not a known defect.
 **Suggested fix:** Add a test that updates a customer-supplied service to shop-supplied-only and asserts `roasting_rate_per_kg` is `null` in the response and database. Add `404` assertions for `PUT` and `PATCH .../toggle` on a missing id. Extend the permitted-admin test to cover update and toggle. Current requirement lost: None.
+**Resolution:**
+
+### F-23 [P3] open - Unbounded stock quantities and non-numeric service ids return 500
+
+**File:** backend/app/Http/Controllers/Api/Admin/InventoryController.php:25,36,63
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: quality/security)
+**Why it matters:** `qty` (`StoreRestockRequest.php:26`) and `change_qty` (`StoreAdjustRequest.php:26`) have no upper bound, while `services.stock_qty` is a Postgres `integer`. A restock or adjust whose result exceeds 2,147,483,647 fails at the database with a numeric overflow and returns a generic 500 instead of a 422. The transaction rolls back, so no data is corrupted. `restock(..., int $service)` and `adjust(..., int $service)` also receive the raw route segment, so `/admin/inventory/abc/restock` raises a `TypeError` and returns 500, where the spec contract says 404. This repeats the F-19 pattern. Reachable only by an authorized admin, so it is not a security break.
+**Suggested fix:** Add a sane `max` to both quantity rules (for example `max:100000` and `between:-100000,100000`), and constrain the two routes with `->whereNumber('service')`. Current requirement lost: None.
+**Resolution:** Re-examined 2026-09-25 by /audit independent (re-review of `54d781e`; scope: current; all lenses). `InventoryController.php:25,36` still take `int $service` with no route constraint (`routes/api.php:412-413`), and `StoreRestockRequest.php:26`/`StoreAdjustRequest.php:26` still have no upper bound. `applyChange` now starts at line 62. Still open.
+
+### F-24 [P3] open - Inventory page and log table fail silently when their queries error
+
+**File:** frontend/src/features/inventory/InventoryPage.tsx:94,154
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `useInventory()` and `useInventoryLogs(page)` read only `data` and `isLoading`. On a 403 (for example a disabled admin whose `/me` still lists permissions, see F-11), a 5xx, or a network failure, the page shows headings with no table and no message. The coding standards say to surface errors rather than fail silently. This is the same pattern as F-10 and F-20, on a new page. The row mutations do surface errors correctly.
+**Suggested fix:** Destructure `isError`/`error` from both queries and render an inline `getGenericErrorMessage(error)` when a query fails. Current requirement lost: None.
+**Resolution:** Re-examined 2026-09-25 by /audit independent (re-review of `54d781e`; scope: current; all lenses). `InventoryPage.tsx:94` and `:154` still read only `data`/`isLoading`. Still open.
+
+### F-27 [P3] open - Inventory adjust-below-zero rejection shows a generic "try again" message
+
+**File:** frontend/src/features/inventory/InventoryPage.tsx:44
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: quality)
+**Why it matters:** The spec's one expected business rejection on this page is the 422 when an adjust would take stock below zero. The backend returns a field message, "This change would take stock below zero." (`InventoryController.php:72-74`). The row mutation's `onError` passes every error to `getGenericErrorMessage()`, which has no 422 branch (`frontend/src/lib/errors.ts`), so the admin sees "Something went wrong. Please try again." That message is misleading: retrying fails the same way, and it hides why. Every other form in the app branches on `status === 422` to show the server's field message (`ServicesPage.tsx:171`, `AdminAccountsPage.tsx:102`, and the auth pages), so this also drifts from the local pattern. The backend guard still holds, so no data is affected.
+**Suggested fix:** In `onAdjust`'s (and `onRestock`'s) `onError`, when `isAxiosError(error) && error.response?.status === 422`, show the first message from `error.response.data.errors` (for example `change_qty[0]`), otherwise fall back to `getGenericErrorMessage(error)`. Current requirement lost: None.
+**Resolution:**
+
+### F-28 [P3] open - low_stock_threshold has no upper bound, so large values return 500
+
+**File:** backend/app/Http/Requests/Admin/StoreServiceRequest.php:34
+**Found:** 2026-09-25 by /audit independent (scope: current; lens: quality/security)
+**Why it matters:** The F-22 repair added `'low_stock_threshold' => ['required', 'integer', 'min:0']` with no `max`. The column is a Postgres `integer` (`unsignedInteger` maps to signed `integer` on Postgres; max 2,147,483,647). A value such as 3000000000 passes Laravel's `integer` rule on 64-bit PHP and then fails at the database with a numeric overflow, so the admin gets a generic 500 instead of a field error. The frontend zod schema (`ServicesPage.tsx:23`) also has no max. This is the F-19 and F-23 pattern on a new field. Reachable only by an authorized admin, so it is not a security break, and nothing is written.
+**Suggested fix:** Add a sane `max` (for example `max:1000000`) to the rule, and optionally mirror it in the zod schema. Current requirement lost: None.
 **Resolution:**

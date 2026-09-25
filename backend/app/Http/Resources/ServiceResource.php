@@ -28,6 +28,8 @@ class ServiceResource extends JsonResource
             'allow_customer_supplied' => $this->allow_customer_supplied,
             'allow_shop_supplied' => $this->allow_shop_supplied,
             'stock_qty' => $this->stock_qty,
+            'low_stock_threshold' => $this->low_stock_threshold,
+            'is_low_stock' => $this->isLowStock(),
             'is_active' => $this->is_active,
         ];
     }

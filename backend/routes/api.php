@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Admin\AdminAccountController;
 use App\Http\Controllers\Api\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Api\Admin\InventoryController as AdminInventoryController;
 use App\Http\Controllers\Api\Admin\ServiceController as AdminServiceController;
 use App\Http\Controllers\Api\Customer\AuthController as CustomerAuthController;
 use App\Http\Controllers\Api\Customer\ProfileController;
@@ -25,6 +26,13 @@ Route::prefix('v1')->group(function () {
             Route::post('/services', [AdminServiceController::class, 'store']);
             Route::put('/services/{id}', [AdminServiceController::class, 'update']);
             Route::patch('/services/{id}/toggle', [AdminServiceController::class, 'toggle']);
+        });
+
+        Route::middleware(['auth:sanctum', 'role:admin,super_admin', 'module:inventory'])->group(function () {
+            Route::get('/inventory', [AdminInventoryController::class, 'index']);
+            Route::get('/inventory/logs', [AdminInventoryController::class, 'logs']);
+            Route::post('/inventory/{service}/restock', [AdminInventoryController::class, 'restock']);
+            Route::post('/inventory/{service}/adjust', [AdminInventoryController::class, 'adjust']);
         });
     });
 

@@ -31,6 +31,7 @@ class StoreServiceRequest extends FormRequest
             'allow_shop_supplied' => ['required', 'boolean'],
             'roasting_rate_per_kg' => ['nullable', 'numeric', 'min:0', 'required_if:allow_customer_supplied,true'],
             'shop_price' => ['nullable', 'numeric', 'min:0', 'required_if:allow_shop_supplied,true'],
+            'low_stock_threshold' => ['required', 'integer', 'min:0'],
         ];
     }
 

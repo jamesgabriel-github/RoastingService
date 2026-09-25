@@ -71,6 +71,7 @@ class ServiceManagementTest extends TestCase
             'allow_shop_supplied' => false,
             'roasting_rate_per_kg' => 175.50,
             'shop_price' => null,
+            'low_stock_threshold' => 5,
         ], $overrides);
     }
 
@@ -193,5 +194,20 @@ class ServiceManagementTest extends TestCase
 
         $response->assertCreated();
         $response->assertJson(['stock_qty' => 0]);
+    }
+
+    public function test_low_stock_threshold_is_saved_on_create_and_update(): void
+    {
+        $this->loginAsSuperAdmin();
+
+        $create = $this->postJson('/api/v1/admin/services', $this->validPayload(['low_stock_threshold' => 8]));
+        $create->assertCreated();
+        $create->assertJson(['low_stock_threshold' => 8]);
+        $id = $create->json('id');
+
+        $update = $this->putJson("/api/v1/admin/services/{$id}", $this->validPayload(['low_stock_threshold' => 12]));
+        $update->assertOk();
+        $update->assertJson(['low_stock_threshold' => 12]);
+        $this->assertDatabaseHas('services', ['id' => $id, 'low_stock_threshold' => 12]);
     }
 }

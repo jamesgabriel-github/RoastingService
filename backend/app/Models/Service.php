@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
     'allow_customer_supplied',
     'allow_shop_supplied',
     'stock_qty',
+    'low_stock_threshold',
     'is_active',
 ])]
 class Service extends Model
@@ -35,7 +36,13 @@ class Service extends Model
             'allow_customer_supplied' => 'boolean',
             'allow_shop_supplied' => 'boolean',
             'stock_qty' => 'integer',
+            'low_stock_threshold' => 'integer',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function isLowStock(): bool
+    {
+        return $this->stock_qty <= $this->low_stock_threshold;
     }
 }

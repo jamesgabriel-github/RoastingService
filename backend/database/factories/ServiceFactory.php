@@ -26,6 +26,7 @@ class ServiceFactory extends Factory
             'allow_customer_supplied' => true,
             'allow_shop_supplied' => false,
             'stock_qty' => 0,
+            'low_stock_threshold' => 5,
             'is_active' => true,
         ];
     }
