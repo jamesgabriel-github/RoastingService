@@ -36,6 +36,7 @@ class StoreBookingRequest extends FormRequest
             'fulfillment' => ['required', 'string', 'in:pickup,delivery'],
             'delivery_address' => ['nullable', 'string', 'max:500', 'required_if:fulfillment,delivery'],
             'preferred_dropoff_at' => ['required', 'date', 'after:now'],
+            'preferred_pickup_at' => ['required', 'date', 'after:preferred_dropoff_at'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
     }

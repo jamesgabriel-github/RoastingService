@@ -30,6 +30,7 @@ class BookingManagementTest extends TestCase
             ],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
             'notes' => 'Extra crispy please',
         ]);
 
@@ -79,6 +80,7 @@ class BookingManagementTest extends TestCase
             ],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertCreated();
@@ -97,6 +99,7 @@ class BookingManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 2]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertUnprocessable();
@@ -113,6 +116,7 @@ class BookingManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 2]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertUnprocessable();
@@ -129,6 +133,7 @@ class BookingManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 2]],
             'fulfillment' => 'delivery',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertUnprocessable();
@@ -146,6 +151,7 @@ class BookingManagementTest extends TestCase
             'fulfillment' => 'delivery',
             'delivery_address' => '123 Rizal St, Manila',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertCreated();
@@ -162,10 +168,44 @@ class BookingManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 2]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->subDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDay()->toIso8601String(),
         ]);
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['preferred_dropoff_at']);
+    }
+
+    public function test_a_missing_preferred_pickup_at_is_rejected(): void
+    {
+        $customer = User::factory()->completeProfile()->create();
+        $this->actingAs($customer, 'web');
+        $service = Service::factory()->create();
+
+        $response = $this->postJson('/api/v1/bookings', [
+            'items' => [['service_id' => $service->id, 'est_weight_kg' => 2]],
+            'fulfillment' => 'pickup',
+            'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['preferred_pickup_at']);
+    }
+
+    public function test_a_preferred_pickup_before_dropoff_is_rejected(): void
+    {
+        $customer = User::factory()->completeProfile()->create();
+        $this->actingAs($customer, 'web');
+        $service = Service::factory()->create();
+
+        $response = $this->postJson('/api/v1/bookings', [
+            'items' => [['service_id' => $service->id, 'est_weight_kg' => 2]],
+            'fulfillment' => 'pickup',
+            'preferred_dropoff_at' => now()->addDays(2)->toIso8601String(),
+            'preferred_pickup_at' => now()->addDay()->toIso8601String(),
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['preferred_pickup_at']);
     }
 
     public function test_an_over_bounds_weight_is_rejected(): void
@@ -178,6 +218,7 @@ class BookingManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 5000]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertUnprocessable();
@@ -195,6 +236,7 @@ class BookingManagementTest extends TestCase
             'fulfillment' => 'delivery',
             'delivery_address' => str_repeat('a', 500),
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
             'notes' => str_repeat('b', 1000),
         ]);
 
@@ -211,6 +253,7 @@ class BookingManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 2.555]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertUnprocessable();
@@ -229,6 +272,7 @@ class BookingManagementTest extends TestCase
             'items' => $items,
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertUnprocessable();
@@ -245,6 +289,7 @@ class BookingManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 2]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertForbidden();
@@ -259,6 +304,7 @@ class BookingManagementTest extends TestCase
             'items' => [],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertUnprocessable();
@@ -275,6 +321,7 @@ class BookingManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 2]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertForbidden();
@@ -290,6 +337,7 @@ class BookingManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 2]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertForbidden();
@@ -303,6 +351,7 @@ class BookingManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 2]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ]);
 
         $response->assertUnauthorized();
@@ -318,12 +367,14 @@ class BookingManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 1]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ])->assertCreated()->json('code');
 
         $second = $this->postJson('/api/v1/bookings', [
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 1]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ])->assertCreated()->json('code');
 
         $this->assertNotSame($first, $second);

@@ -40,6 +40,7 @@ class MyBookingsTest extends TestCase
             'items' => [['service_id' => $service->id, 'est_weight_kg' => 2]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ])->assertCreated()->json('code');
 
         return $code;
@@ -143,6 +144,7 @@ class MyBookingsTest extends TestCase
                 ['service_id' => $service->id, 'qty' => 3],
             ],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->addHour()->toIso8601String(),
         ])->assertCreated();
 
         $booking = Booking::first();
@@ -163,6 +165,7 @@ class MyBookingsTest extends TestCase
         $this->postJson('/api/v1/orders', [
             'items' => [['service_id' => $service->id, 'qty' => 4]],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->addHour()->toIso8601String(),
         ])->assertCreated();
 
         $booking = Booking::first();

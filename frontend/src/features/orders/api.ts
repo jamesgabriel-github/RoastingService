@@ -6,6 +6,7 @@ export interface NewOrderPayload {
   items: { service_id: number; qty: number }[]
   fulfillment: Fulfillment
   delivery_address: string | null
+  preferred_pickup_at: string
   notes: string | null
 }
 

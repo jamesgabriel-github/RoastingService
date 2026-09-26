@@ -37,10 +37,11 @@ export async function fetchBookingCounts(): Promise<BookingCounts> {
 export async function fetchAdminBookings(
   status: QueueStatus,
   search: string,
-  page: number
+  page: number,
+  date: string
 ): Promise<PaginatedAdminBookings> {
   const { data } = await api.get<PaginatedAdminBookings>('/admin/bookings', {
-    params: { status, search: search.trim() || undefined, page },
+    params: { status, search: search.trim() || undefined, page, date },
   })
   return data
 }
@@ -131,6 +132,7 @@ export interface WalkInRoastingPayload extends WalkInGuestOrCustomer {
   items: { service_id: number; final_weight_kg: number }[]
   fulfillment: AdminBooking['fulfillment']
   delivery_address: string | null
+  preferred_pickup_at: string
   notes: string | null
 }
 
@@ -144,6 +146,7 @@ export interface WalkInShopPayload extends WalkInGuestOrCustomer {
   items: { service_id: number; qty: number }[]
   fulfillment: AdminBooking['fulfillment']
   delivery_address: string | null
+  preferred_pickup_at: string
   notes: string | null
 }
 

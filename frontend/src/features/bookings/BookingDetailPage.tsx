@@ -75,6 +75,9 @@ export function BookingDetailPage() {
         )}
         <p>Fulfillment: {booking.fulfillment}</p>
         {booking.delivery_address && <p>Delivery address: {booking.delivery_address}</p>}
+        {booking.preferred_pickup_at && (
+          <p>Preferred pickup/delivery: {new Date(booking.preferred_pickup_at).toLocaleString()}</p>
+        )}
         {booking.notes && <p>Notes: {booking.notes}</p>}
       </div>
 

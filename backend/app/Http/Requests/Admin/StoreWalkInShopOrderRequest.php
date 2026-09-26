@@ -44,6 +44,7 @@ class StoreWalkInShopOrderRequest extends FormRequest
             'items.*.qty' => ['required', 'integer', 'min:1', 'max:1000'],
             'fulfillment' => ['required', 'string', 'in:pickup,delivery'],
             'delivery_address' => ['nullable', 'string', 'max:500', 'required_if:fulfillment,delivery'],
+            'preferred_pickup_at' => ['required', 'date', 'after_or_equal:now'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
     }

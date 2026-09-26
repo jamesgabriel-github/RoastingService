@@ -96,6 +96,19 @@ class AdminBookingQueuesTest extends TestCase
         $this->assertSame([$pending->code], $codes);
     }
 
+    public function test_date_filter_excludes_bookings_outside_the_selected_date(): void
+    {
+        $this->loginAsSuperAdmin();
+        $today = Booking::factory()->create(['status' => 'pending_review', 'preferred_pickup_at' => now()]);
+        Booking::factory()->create(['status' => 'pending_review', 'preferred_pickup_at' => now()->addDays(3)]);
+
+        $response = $this->getJson('/api/v1/admin/bookings?status=pending_review&date='.now()->toDateString());
+
+        $response->assertOk();
+        $codes = collect($response->json('data'))->pluck('code')->all();
+        $this->assertSame([$today->code], $codes);
+    }
+
     public function test_an_invalid_status_is_rejected(): void
     {
         $this->loginAsSuperAdmin();

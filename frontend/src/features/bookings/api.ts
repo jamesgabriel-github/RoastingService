@@ -6,6 +6,7 @@ export interface NewBookingPayload {
   fulfillment: Fulfillment
   delivery_address: string | null
   preferred_dropoff_at: string
+  preferred_pickup_at: string
   notes: string | null
 }
 

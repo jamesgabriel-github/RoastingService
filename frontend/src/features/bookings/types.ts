@@ -40,6 +40,7 @@ export interface Booking {
   estimated_total: string
   total_amount: string | null
   preferred_dropoff_at: string | null
+  preferred_pickup_at: string | null
   notes: string | null
   items: BookingItem[]
   status_logs?: BookingStatusLog[]

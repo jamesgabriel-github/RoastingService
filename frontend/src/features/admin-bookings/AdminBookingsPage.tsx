@@ -8,12 +8,19 @@ import { QUEUE_TABS } from './types'
 import type { QueueStatus } from './types'
 import { formatWaitingTime } from './waitingTime'
 
+function todayDateString(): string {
+  const now = new Date()
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}
+
 export function AdminBookingsPage() {
   const [status, setStatus] = useState<QueueStatus>('pending_review')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [date, setDate] = useState(todayDateString)
   const { data: counts } = useBookingCounts()
-  const { data, isLoading } = useAdminBookings(status, search, page)
+  const { data, isLoading } = useAdminBookings(status, search, page, date)
 
   const selectTab = (next: QueueStatus) => {
     setStatus(next)
@@ -42,15 +49,26 @@ export function AdminBookingsPage() {
         ))}
       </div>
 
-      <Input
-        className="max-w-sm"
-        placeholder="Search by code, name, or phone"
-        value={search}
-        onChange={(event) => {
-          setSearch(event.target.value)
-          setPage(1)
-        }}
-      />
+      <div className="flex flex-wrap gap-2">
+        <Input
+          className="max-w-sm"
+          placeholder="Search by code, name, or phone"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value)
+            setPage(1)
+          }}
+        />
+        <Input
+          type="date"
+          className="w-fit"
+          value={date}
+          onChange={(event) => {
+            setDate(event.target.value)
+            setPage(1)
+          }}
+        />
+      </div>
 
       {isLoading && <p>Loading…</p>}
       {data && data.data.length === 0 && <p className="text-muted-foreground">No bookings in this queue.</p>}

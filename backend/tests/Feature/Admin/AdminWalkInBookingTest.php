@@ -58,6 +58,7 @@ class AdminWalkInBookingTest extends TestCase
             'customer_id' => $customer->id,
             'items' => [['service_id' => $service->id, 'final_weight_kg' => 2.5]],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
         ]);
 
         $response->assertCreated();
@@ -92,6 +93,7 @@ class AdminWalkInBookingTest extends TestCase
             'guest_phone' => '09171234567',
             'items' => [['service_id' => $service->id, 'final_weight_kg' => 2]],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
         ]);
 
         $response->assertCreated();
@@ -116,6 +118,7 @@ class AdminWalkInBookingTest extends TestCase
                 ['service_id' => $serviceB->id, 'qty' => 1],
             ],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
         ]);
 
         $response->assertCreated();
@@ -161,6 +164,7 @@ class AdminWalkInBookingTest extends TestCase
             'guest_phone' => '09179998888',
             'items' => [['service_id' => $service->id, 'qty' => 1]],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
         ]);
 
         $response->assertCreated();
@@ -181,6 +185,7 @@ class AdminWalkInBookingTest extends TestCase
             'guest_phone' => '09179998888',
             'items' => [['service_id' => $service->id, 'qty' => 5]],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
         ]);
 
         $response->assertUnprocessable();

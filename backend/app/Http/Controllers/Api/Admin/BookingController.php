@@ -50,9 +50,14 @@ class BookingController extends Controller
         $validated = $request->validate([
             'status' => ['required', 'string', 'in:'.implode(',', self::QUEUE_STATUSES)],
             'search' => ['nullable', 'string', 'max:255'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
-        $query = Booking::where('status', $validated['status'])->with(['customer', 'latestStatusLog']);
+        $date = $validated['date'] ?? now()->toDateString();
+
+        $query = Booking::where('status', $validated['status'])
+            ->whereDate('preferred_pickup_at', $date)
+            ->with(['customer', 'latestStatusLog']);
 
         if (! empty($validated['search'])) {
             $like = '%'.$validated['search'].'%';

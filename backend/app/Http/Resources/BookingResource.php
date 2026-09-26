@@ -29,6 +29,7 @@ class BookingResource extends JsonResource
             'estimated_total' => $this->estimated_total,
             'total_amount' => $this->total_amount,
             'preferred_dropoff_at' => $this->preferred_dropoff_at,
+            'preferred_pickup_at' => $this->preferred_pickup_at,
             'notes' => $this->notes,
             'items' => BookingItemResource::collection($this->whenLoaded('items')),
             'status_logs' => BookingStatusLogResource::collection($this->whenLoaded('statusLogs')),

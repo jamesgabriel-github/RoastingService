@@ -28,6 +28,7 @@ class ShopOrderManagementTest extends TestCase
         $response = $this->postJson('/api/v1/orders', [
             'items' => [['service_id' => $service->id, 'qty' => 3]],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->addHour()->toIso8601String(),
             'notes' => 'Please pack separately',
         ]);
 
@@ -84,6 +85,7 @@ class ShopOrderManagementTest extends TestCase
                 ['service_id' => $liempo->id, 'qty' => 1],
             ],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->addHour()->toIso8601String(),
         ]);
 
         $response->assertCreated();
@@ -100,6 +102,7 @@ class ShopOrderManagementTest extends TestCase
         $response = $this->postJson('/api/v1/orders', [
             'items' => [['service_id' => $service->id, 'qty' => 3]],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->addHour()->toIso8601String(),
         ]);
 
         $response->assertUnprocessable();
@@ -122,6 +125,7 @@ class ShopOrderManagementTest extends TestCase
                 ['service_id' => $scarce->id, 'qty' => 2],
             ],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->addHour()->toIso8601String(),
         ]);
 
         $response->assertUnprocessable();
@@ -185,10 +189,26 @@ class ShopOrderManagementTest extends TestCase
             'items' => [['service_id' => $service->id, 'qty' => 1]],
             'fulfillment' => 'delivery',
             'delivery_address' => '123 Rizal St, Manila',
+            'preferred_pickup_at' => now()->addHour()->toIso8601String(),
         ]);
 
         $response->assertCreated();
         $response->assertJson(['delivery_address' => '123 Rizal St, Manila']);
+    }
+
+    public function test_a_missing_preferred_pickup_at_is_rejected(): void
+    {
+        $customer = User::factory()->completeProfile()->create();
+        $this->actingAs($customer, 'web');
+        $service = Service::factory()->shopSupplied()->create(['stock_qty' => 5]);
+
+        $response = $this->postJson('/api/v1/orders', [
+            'items' => [['service_id' => $service->id, 'qty' => 1]],
+            'fulfillment' => 'pickup',
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['preferred_pickup_at']);
     }
 
     public function test_an_over_bound_quantity_is_rejected(): void
@@ -274,11 +294,13 @@ class ShopOrderManagementTest extends TestCase
             'items' => [['service_id' => $roasting->id, 'est_weight_kg' => 1]],
             'fulfillment' => 'pickup',
             'preferred_dropoff_at' => now()->addDay()->toIso8601String(),
+            'preferred_pickup_at' => now()->addDays(2)->toIso8601String(),
         ])->assertCreated()->json('code');
 
         $second = $this->postJson('/api/v1/orders', [
             'items' => [['service_id' => $shop->id, 'qty' => 1]],
             'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->addHour()->toIso8601String(),
         ])->assertCreated()->json('code');
 
         $this->assertNotSame($first, $second);

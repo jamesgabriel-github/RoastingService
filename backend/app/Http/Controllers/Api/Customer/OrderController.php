@@ -75,6 +75,7 @@ class OrderController extends Controller
                 'fulfillment' => $request->validated('fulfillment'),
                 'delivery_address' => $request->validated('delivery_address'),
                 'shipping_fee' => 0,
+                'preferred_pickup_at' => $request->validated('preferred_pickup_at'),
                 'estimated_total' => 0,
                 'total_amount' => round($totalAmount, 2),
                 'notes' => $request->validated('notes'),

@@ -111,6 +111,7 @@ class BookingController extends Controller
                 'delivery_address' => $request->validated('delivery_address'),
                 'shipping_fee' => 0,
                 'preferred_dropoff_at' => $request->validated('preferred_dropoff_at'),
+                'preferred_pickup_at' => $request->validated('preferred_pickup_at'),
                 'estimated_total' => round($estimatedTotal, 2),
                 'notes' => $request->validated('notes'),
             ]);

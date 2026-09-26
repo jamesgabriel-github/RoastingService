@@ -52,6 +52,7 @@ export interface AdminBooking {
   paid_amount: string
   balance: string | null
   preferred_dropoff_at: string | null
+  preferred_pickup_at: string | null
   dropoff_at: string | null
   approved_at: string | null
   approved_by_name: string | null

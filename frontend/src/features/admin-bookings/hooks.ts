@@ -37,10 +37,10 @@ export function useBookingCounts() {
   })
 }
 
-export function useAdminBookings(status: QueueStatus, search: string, page: number) {
+export function useAdminBookings(status: QueueStatus, search: string, page: number, date: string) {
   return useQuery({
-    queryKey: ['admin-bookings', status, search, page],
-    queryFn: () => fetchAdminBookings(status, search, page),
+    queryKey: ['admin-bookings', status, search, page, date],
+    queryFn: () => fetchAdminBookings(status, search, page, date),
   })
 }
 

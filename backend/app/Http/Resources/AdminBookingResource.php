@@ -38,6 +38,7 @@ class AdminBookingResource extends JsonResource
             'paid_amount' => $paidAmount,
             'balance' => $this->total_amount === null ? null : number_format((float) $this->total_amount - (float) $paidAmount, 2, '.', ''),
             'preferred_dropoff_at' => $this->preferred_dropoff_at,
+            'preferred_pickup_at' => $this->preferred_pickup_at,
             'dropoff_at' => $this->dropoff_at,
             'approved_at' => $this->approved_at,
             'approved_by_name' => $this->whenLoaded('approver', fn () => $this->approver?->name),

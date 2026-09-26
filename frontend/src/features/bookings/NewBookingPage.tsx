@@ -23,6 +23,7 @@ const bookingSchema = z
     fulfillment: z.enum(['pickup', 'delivery']),
     delivery_address: z.string().optional(),
     preferred_dropoff_at: z.string().min(1, 'Choose a drop-off date and time'),
+    preferred_pickup_at: z.string().min(1, 'Choose a pickup or delivery date and time'),
     notes: z.string().optional(),
   })
   .superRefine((values, ctx) => {
@@ -42,6 +43,7 @@ const emptyValues: BookingFormValues = {
   fulfillment: 'pickup',
   delivery_address: '',
   preferred_dropoff_at: '',
+  preferred_pickup_at: '',
   notes: '',
 }
 
@@ -117,6 +119,7 @@ export function NewBookingPage() {
         fulfillment: values.fulfillment,
         delivery_address: values.fulfillment === 'delivery' ? (values.delivery_address?.trim() ?? null) : null,
         preferred_dropoff_at: new Date(values.preferred_dropoff_at).toISOString(),
+        preferred_pickup_at: new Date(values.preferred_pickup_at).toISOString(),
         notes: values.notes?.trim() ? values.notes.trim() : null,
       },
       {
@@ -233,6 +236,14 @@ export function NewBookingPage() {
           <Input id="preferred_dropoff_at" type="datetime-local" {...register('preferred_dropoff_at')} />
           {errors.preferred_dropoff_at && (
             <p className="text-sm text-destructive">{errors.preferred_dropoff_at.message}</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="preferred_pickup_at">Preferred pickup/delivery</Label>
+          <Input id="preferred_pickup_at" type="datetime-local" {...register('preferred_pickup_at')} />
+          {errors.preferred_pickup_at && (
+            <p className="text-sm text-destructive">{errors.preferred_pickup_at.message}</p>
           )}
         </div>
 

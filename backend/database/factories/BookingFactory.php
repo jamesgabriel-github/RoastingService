@@ -26,6 +26,7 @@ class BookingFactory extends Factory
             'shipping_fee' => 0,
             'status' => 'pending_review',
             'preferred_dropoff_at' => now()->addDay(),
+            'preferred_pickup_at' => now(),
             'estimated_total' => 0,
         ];
     }
