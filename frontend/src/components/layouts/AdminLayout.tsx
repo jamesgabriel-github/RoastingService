@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { parseQueueStatus, QUEUE_TABS } from '@/features/admin-bookings/types'
+import { parseQueueGroup, QUEUE_TABS } from '@/features/admin-bookings/types'
 import { useAdminLogout, useMe } from '@/features/auth/hooks'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -16,8 +16,8 @@ export function AdminLayout() {
   const location = useLocation()
 
   const canSeeBookings = me?.role === 'super_admin' || me?.permissions.includes('bookings')
-  const activeBookingStatus =
-    location.pathname === '/admin/bookings' ? parseQueueStatus(new URLSearchParams(location.search).get('status')) : null
+  const activeBookingGroup =
+    location.pathname === '/admin/bookings' ? parseQueueGroup(new URLSearchParams(location.search).get('group')) : null
 
   return (
     <div className="flex min-h-svh">
@@ -39,9 +39,9 @@ export function AdminLayout() {
               <div className="flex flex-col gap-1 pl-3">
                 {QUEUE_TABS.map((tab) => (
                   <Link
-                    key={tab.status}
-                    to={`/admin/bookings?status=${tab.status}`}
-                    className={subLinkClass(activeBookingStatus === tab.status)}
+                    key={tab.group}
+                    to={`/admin/bookings?group=${tab.group}`}
+                    className={subLinkClass(activeBookingGroup === tab.group)}
                   >
                     {tab.label}
                   </Link>

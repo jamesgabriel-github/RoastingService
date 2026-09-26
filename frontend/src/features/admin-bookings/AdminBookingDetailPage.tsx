@@ -23,8 +23,8 @@ import {
   useStartCooking,
   useWeighInBooking,
 } from './hooks'
-import type { AdminBooking } from './types'
-import { isAdminCancellable } from './types'
+import type { AdminBooking, AdminBookingItem } from './types'
+import { getCommonStatus, isAdminCancellable } from './types'
 
 const PAYMENT_ELIGIBLE_STATUSES = ['confirmed', 'cooking', 'ready', 'out_for_delivery', 'completed']
 
@@ -157,7 +157,7 @@ function WeighInActions({ booking }: { booking: AdminBooking }) {
   const [error, setError] = useState<string | null>(null)
   const weighIn = useWeighInBooking()
 
-  const items = booking.items ?? []
+  const items = booking.items
   const canSubmit = items.every((item) => Number(weights[item.id]) > 0)
 
   const onWeighIn = () => {
@@ -202,19 +202,18 @@ function WeighInActions({ booking }: { booking: AdminBooking }) {
   )
 }
 
-function StartCookingAction({ booking }: { booking: AdminBooking }) {
+function StartCookingAction({ item }: { item: AdminBookingItem }) {
   const [error, setError] = useState<string | null>(null)
   const startCooking = useStartCooking()
 
   const onStart = () => {
     setError(null)
-    startCooking.mutate(booking.id, { onError: (err) => setError(getActionErrorMessage(err)) })
+    startCooking.mutate(item.id, { onError: (err) => setError(getActionErrorMessage(err)) })
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border p-3">
-      <h2 className="font-semibold">Actions</h2>
-      <Button disabled={startCooking.isPending} onClick={onStart}>
+    <div className="flex flex-col gap-1">
+      <Button size="sm" disabled={startCooking.isPending} onClick={onStart}>
         Start cooking
       </Button>
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -222,7 +221,7 @@ function StartCookingAction({ booking }: { booking: AdminBooking }) {
   )
 }
 
-function CookingActions({ booking }: { booking: AdminBooking }) {
+function CookingActions({ booking, item }: { booking: AdminBooking; item: AdminBookingItem }) {
   const [error, setError] = useState<string | null>(null)
   const markReady = useMarkReady()
   const markOutForDelivery = useMarkOutForDelivery()
@@ -231,16 +230,15 @@ function CookingActions({ booking }: { booking: AdminBooking }) {
   const onAdvance = () => {
     setError(null)
     if (booking.fulfillment === 'pickup') {
-      markReady.mutate(booking.id, { onError: (err) => setError(getActionErrorMessage(err)) })
+      markReady.mutate(item.id, { onError: (err) => setError(getActionErrorMessage(err)) })
     } else {
-      markOutForDelivery.mutate(booking.id, { onError: (err) => setError(getActionErrorMessage(err)) })
+      markOutForDelivery.mutate(item.id, { onError: (err) => setError(getActionErrorMessage(err)) })
     }
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border p-3">
-      <h2 className="font-semibold">Actions</h2>
-      <Button disabled={isSaving} onClick={onAdvance}>
+    <div className="flex flex-col gap-1">
+      <Button size="sm" disabled={isSaving} onClick={onAdvance}>
         {booking.fulfillment === 'pickup' ? 'Mark ready' : 'Out for delivery'}
       </Button>
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -248,24 +246,36 @@ function CookingActions({ booking }: { booking: AdminBooking }) {
   )
 }
 
-function CompleteAction({ booking }: { booking: AdminBooking }) {
+function CompleteAction({ item }: { item: AdminBookingItem }) {
   const [error, setError] = useState<string | null>(null)
   const complete = useCompleteBooking()
 
   const onComplete = () => {
     setError(null)
-    complete.mutate(booking.id, { onError: (err) => setError(getActionErrorMessage(err)) })
+    complete.mutate(item.id, { onError: (err) => setError(getActionErrorMessage(err)) })
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border p-3">
-      <h2 className="font-semibold">Actions</h2>
-      <Button disabled={complete.isPending} onClick={onComplete}>
+    <div className="flex flex-col gap-1">
+      <Button size="sm" disabled={complete.isPending} onClick={onComplete}>
         Complete
       </Button>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   )
+}
+
+function ItemFulfillmentActions({ booking, item }: { booking: AdminBooking; item: AdminBookingItem }) {
+  if (item.status === 'confirmed') {
+    return <StartCookingAction item={item} />
+  }
+  if (item.status === 'cooking') {
+    return <CookingActions booking={booking} item={item} />
+  }
+  if (item.status === 'ready' || item.status === 'out_for_delivery') {
+    return <CompleteAction item={item} />
+  }
+  return null
 }
 
 function NoShowAction({ booking }: { booking: AdminBooking }) {
@@ -392,8 +402,9 @@ export function AdminBookingDetailPage() {
   }
 
   const isOrder = booking.is_order
+  const commonStatus = getCommonStatus(booking.items)
   const canRecordPayment =
-    PAYMENT_ELIGIBLE_STATUSES.includes(booking.status) &&
+    booking.items.every((item) => PAYMENT_ELIGIBLE_STATUSES.includes(item.status)) &&
     Number(booking.balance) > 0 &&
     (me?.role === 'super_admin' || me?.permissions.includes('payments'))
 
@@ -414,35 +425,13 @@ export function AdminBookingDetailPage() {
           <p>Preferred pickup/delivery: {new Date(booking.preferred_pickup_at).toLocaleString()}</p>
         )}
         {booking.notes && <p>Notes: {booking.notes}</p>}
-        {booking.dropoff_at && (
-          <p>
-            Scheduled drop-off: {new Date(booking.dropoff_at).toLocaleString()}
-            {booking.approved_by_name ? ` - approved by ${booking.approved_by_name}` : ''}
-          </p>
-        )}
-        {booking.status === 'rejected' && booking.reject_reason && <p>Rejected: {booking.reject_reason}</p>}
-        {booking.weighed_at && (
-          <p>
-            Weighed in: {new Date(booking.weighed_at).toLocaleString()}
-            {booking.confirmed_by_name ? ` - confirmed by ${booking.confirmed_by_name}` : ''}
-          </p>
-        )}
-        {booking.cooking_started_at && (
-          <p>Cooking started: {new Date(booking.cooking_started_at).toLocaleString()}</p>
-        )}
-        {booking.est_ready_at && <p>Estimated ready: {new Date(booking.est_ready_at).toLocaleString()}</p>}
-        {booking.completed_at && <p>Completed: {new Date(booking.completed_at).toLocaleString()}</p>}
+        {booking.dropoff_at && <p>Scheduled drop-off: {new Date(booking.dropoff_at).toLocaleString()}</p>}
       </div>
 
-      {!isOrder && booking.status === 'pending_review' && <ApproveRejectActions booking={booking} />}
-      {!isOrder && booking.status === 'approved' && <WeighInActions booking={booking} />}
-      {!isOrder && booking.status === 'approved' && <NoShowAction booking={booking} />}
-      {isOrder && booking.status === 'pending_confirmation' && <ConfirmRejectOrderActions booking={booking} />}
-      {booking.status === 'confirmed' && <StartCookingAction booking={booking} />}
-      {booking.status === 'cooking' && <CookingActions booking={booking} />}
-      {(booking.status === 'ready' || booking.status === 'out_for_delivery') && (
-        <CompleteAction booking={booking} />
-      )}
+      {!isOrder && commonStatus === 'pending_review' && <ApproveRejectActions booking={booking} />}
+      {!isOrder && commonStatus === 'approved' && <WeighInActions booking={booking} />}
+      {!isOrder && commonStatus === 'approved' && <NoShowAction booking={booking} />}
+      {isOrder && commonStatus === 'pending_confirmation' && <ConfirmRejectOrderActions booking={booking} />}
       {isAdminCancellable(booking) && <CancelAction booking={booking} />}
 
       <div className="flex flex-col gap-2 rounded-lg border p-3">
@@ -450,7 +439,10 @@ export function AdminBookingDetailPage() {
         <ul className="flex flex-col gap-1">
           {booking.status_logs?.map((log) => (
             <li key={log.id} className="text-sm">
-              <span className="font-medium">{log.status}</span>{' '}
+              <span className="font-medium">
+                {booking.items.length > 1 && log.service_name ? `${log.service_name}: ` : ''}
+                {log.status}
+              </span>{' '}
               <span className="text-muted-foreground">
                 - {new Date(log.created_at).toLocaleString()}
                 {log.changed_by_name ? ` by ${log.changed_by_name}` : ''}
@@ -460,17 +452,51 @@ export function AdminBookingDetailPage() {
         </ul>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-lg border p-3">
+      <div className="flex flex-col gap-3 rounded-lg border p-3">
         <h2 className="font-semibold">Items</h2>
-        {booking.items?.map((item) => (
-          <div key={item.id} className="flex justify-between text-sm">
-            <span>
-              {item.service_name}
-              {!isOrder
-                ? ` - est. ${item.est_weight_kg ?? '—'} kg${item.final_weight_kg ? `, final ${item.final_weight_kg} kg` : ''}`
-                : ` x ${item.qty}`}
-            </span>
-            <span>{formatCurrency(item.subtotal)}</span>
+        {booking.items.map((item) => (
+          <div key={item.id} className="flex flex-col gap-1 border-b pb-3 last:border-b-0 last:pb-0">
+            <div className="flex justify-between text-sm">
+              <span>
+                {item.service_name}
+                {!isOrder
+                  ? ` - est. ${item.est_weight_kg ?? '—'} kg${item.final_weight_kg ? `, final ${item.final_weight_kg} kg` : ''}`
+                  : ` x ${item.qty}`}
+              </span>
+              <span>{formatCurrency(item.subtotal)}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Status: {item.status}
+              {item.reject_reason ? ` - ${item.reject_reason}` : ''}
+            </p>
+            {item.approved_at && (
+              <p className="text-sm text-muted-foreground">
+                Approved: {new Date(item.approved_at).toLocaleString()}
+                {item.approved_by_name ? ` by ${item.approved_by_name}` : ''}
+              </p>
+            )}
+            {item.weighed_at && (
+              <p className="text-sm text-muted-foreground">
+                Weighed in: {new Date(item.weighed_at).toLocaleString()}
+                {item.confirmed_by_name ? ` - confirmed by ${item.confirmed_by_name}` : ''}
+              </p>
+            )}
+            {item.cooking_started_at && (
+              <p className="text-sm text-muted-foreground">
+                Cooking started: {new Date(item.cooking_started_at).toLocaleString()}
+              </p>
+            )}
+            {item.est_ready_at && (
+              <p className="text-sm text-muted-foreground">
+                Estimated ready: {new Date(item.est_ready_at).toLocaleString()}
+              </p>
+            )}
+            {item.completed_at && (
+              <p className="text-sm text-muted-foreground">
+                Completed: {new Date(item.completed_at).toLocaleString()}
+              </p>
+            )}
+            <ItemFulfillmentActions booking={booking} item={item} />
           </div>
         ))}
       </div>

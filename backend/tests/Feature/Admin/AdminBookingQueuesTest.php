@@ -63,68 +63,99 @@ class AdminBookingQueuesTest extends TestCase
         return $admin;
     }
 
-    public function test_counts_reflect_seeded_bookings_per_status(): void
+    /**
+     * Create a booking with a single item at `$status`.
+     */
+    private function itemWithStatus(string $status, array $bookingAttributes = [], array $itemAttributes = [])
+    {
+        $booking = Booking::factory()->create($bookingAttributes);
+
+        return $booking->items()->create(array_merge([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'est_weight_kg' => 3,
+            'rate' => 150,
+            'subtotal' => 450,
+            'status' => $status,
+        ], $itemAttributes));
+    }
+
+    public function test_counts_reflect_seeded_bookings_per_group(): void
     {
         $this->loginAsSuperAdmin();
-        Booking::factory()->count(2)->create(['status' => 'pending_review']);
-        Booking::factory()->create(['status' => 'cooking']);
+        $this->itemWithStatus('pending_review');
+        $this->itemWithStatus('pending_review');
+        $this->itemWithStatus('cooking');
 
         $response = $this->getJson('/api/v1/admin/bookings/counts');
 
         $response->assertOk();
         $response->assertJson([
-            'pending_review' => 2,
-            'pending_confirmation' => 0,
-            'approved' => 0,
-            'confirmed' => 0,
+            'draft' => 2,
+            'pending' => 0,
             'cooking' => 1,
             'ready' => 0,
-            'out_for_delivery' => 0,
+            'completed' => 0,
+            'cancelled' => 0,
         ]);
     }
 
-    public function test_status_filter_returns_only_that_queue(): void
+    public function test_group_filter_returns_only_that_queue(): void
     {
         $this->loginAsSuperAdmin();
-        $pending = Booking::factory()->create(['status' => 'pending_review']);
-        Booking::factory()->create(['status' => 'cooking']);
+        $pending = $this->itemWithStatus('pending_review');
+        $this->itemWithStatus('cooking');
 
-        $response = $this->getJson('/api/v1/admin/bookings?status=pending_review');
+        $response = $this->getJson('/api/v1/admin/bookings?group=draft');
 
         $response->assertOk();
         $codes = collect($response->json('data'))->pluck('code')->all();
-        $this->assertSame([$pending->code], $codes);
+        $this->assertSame([$pending->booking->code], $codes);
+    }
+
+    public function test_a_group_spans_its_raw_statuses(): void
+    {
+        $this->loginAsSuperAdmin();
+        $ready = $this->itemWithStatus('ready');
+        $outForDelivery = $this->itemWithStatus('out_for_delivery');
+        $this->itemWithStatus('cooking');
+
+        $response = $this->getJson('/api/v1/admin/bookings?group=ready');
+
+        $response->assertOk();
+        $codes = collect($response->json('data'))->pluck('code')->all();
+        $this->assertEqualsCanonicalizing([$ready->booking->code, $outForDelivery->booking->code], $codes);
     }
 
     public function test_date_filter_excludes_bookings_outside_the_selected_date(): void
     {
         $this->loginAsSuperAdmin();
-        $today = Booking::factory()->create(['status' => 'pending_review', 'preferred_pickup_at' => now()]);
-        Booking::factory()->create(['status' => 'pending_review', 'preferred_pickup_at' => now()->addDays(3)]);
+        $today = $this->itemWithStatus('pending_review', ['preferred_pickup_at' => now()]);
+        $this->itemWithStatus('pending_review', ['preferred_pickup_at' => now()->addDays(3)]);
 
-        $response = $this->getJson('/api/v1/admin/bookings?status=pending_review&date='.now()->toDateString());
+        $response = $this->getJson('/api/v1/admin/bookings?group=draft&date='.now()->toDateString());
 
         $response->assertOk();
         $codes = collect($response->json('data'))->pluck('code')->all();
-        $this->assertSame([$today->code], $codes);
+        $this->assertSame([$today->booking->code], $codes);
     }
 
-    public function test_an_invalid_status_is_rejected(): void
+    public function test_an_invalid_group_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
 
-        $this->getJson('/api/v1/admin/bookings?status=completed')->assertUnprocessable();
+        $this->getJson('/api/v1/admin/bookings?group=completed_orders')->assertUnprocessable();
     }
 
     public function test_waiting_minutes_is_a_non_negative_whole_number(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
-        $log = BookingStatusLog::create(['booking_id' => $booking->id, 'status' => 'pending_review']);
+        $item = $this->itemWithStatus('pending_review');
+        $log = BookingStatusLog::create(['booking_id' => $item->booking_id, 'booking_item_id' => $item->id, 'status' => 'pending_review']);
         $log->created_at = now()->subMinutes(15);
         $log->save();
 
-        $response = $this->getJson('/api/v1/admin/bookings?status=pending_review');
+        $response = $this->getJson('/api/v1/admin/bookings?group=draft');
 
         $response->assertOk();
         $waitingMinutes = $response->json('data.0.waiting_minutes');
@@ -136,10 +167,10 @@ class AdminBookingQueuesTest extends TestCase
     public function test_search_matches_by_code(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'pending_review', 'code' => 'RS-4242']);
-        Booking::factory()->create(['status' => 'pending_review', 'code' => 'RS-9999']);
+        $booking = $this->itemWithStatus('pending_review', ['code' => 'RS-4242'])->booking;
+        $this->itemWithStatus('pending_review', ['code' => 'RS-9999']);
 
-        $response = $this->getJson('/api/v1/admin/bookings?status=pending_review&search=4242');
+        $response = $this->getJson('/api/v1/admin/bookings?group=draft&search=4242');
 
         $response->assertOk();
         $codes = collect($response->json('data'))->pluck('code')->all();
@@ -150,11 +181,11 @@ class AdminBookingQueuesTest extends TestCase
     {
         $this->loginAsSuperAdmin();
         $customer = User::factory()->create(['first_name' => 'Juan', 'last_name' => 'Dela Cruz']);
-        $booking = Booking::factory()->create(['status' => 'pending_review', 'customer_id' => $customer->id]);
-        Booking::factory()->create(['status' => 'pending_review']);
+        $booking = $this->itemWithStatus('pending_review', ['customer_id' => $customer->id])->booking;
+        $this->itemWithStatus('pending_review');
 
         $response = $this->getJson('/api/v1/admin/bookings?'.http_build_query([
-            'status' => 'pending_review',
+            'group' => 'draft',
             'search' => 'Dela Cruz',
         ]));
 
@@ -167,10 +198,10 @@ class AdminBookingQueuesTest extends TestCase
     {
         $this->loginAsSuperAdmin();
         $customer = User::factory()->create(['phone' => '09171234567']);
-        $booking = Booking::factory()->create(['status' => 'pending_review', 'customer_id' => $customer->id]);
-        Booking::factory()->create(['status' => 'pending_review']);
+        $booking = $this->itemWithStatus('pending_review', ['customer_id' => $customer->id])->booking;
+        $this->itemWithStatus('pending_review');
 
-        $response = $this->getJson('/api/v1/admin/bookings?status=pending_review&search=09171234567');
+        $response = $this->getJson('/api/v1/admin/bookings?group=draft&search=09171234567');
 
         $response->assertOk();
         $codes = collect($response->json('data'))->pluck('code')->all();
@@ -180,75 +211,107 @@ class AdminBookingQueuesTest extends TestCase
     public function test_results_are_ordered_by_longest_waiting_first(): void
     {
         $this->loginAsSuperAdmin();
-        $older = Booking::factory()->create(['status' => 'pending_review']);
-        $olderLog = BookingStatusLog::create(['booking_id' => $older->id, 'status' => 'pending_review']);
+        $older = $this->itemWithStatus('pending_review');
+        $olderLog = BookingStatusLog::create(['booking_id' => $older->booking_id, 'booking_item_id' => $older->id, 'status' => 'pending_review']);
         $olderLog->created_at = now()->subHours(2);
         $olderLog->save();
 
-        $newer = Booking::factory()->create(['status' => 'pending_review']);
-        $newerLog = BookingStatusLog::create(['booking_id' => $newer->id, 'status' => 'pending_review']);
+        $newer = $this->itemWithStatus('pending_review');
+        $newerLog = BookingStatusLog::create(['booking_id' => $newer->booking_id, 'booking_item_id' => $newer->id, 'status' => 'pending_review']);
         $newerLog->created_at = now()->subMinutes(5);
         $newerLog->save();
 
-        $response = $this->getJson('/api/v1/admin/bookings?status=pending_review');
+        $response = $this->getJson('/api/v1/admin/bookings?group=draft');
 
         $response->assertOk();
         $codes = collect($response->json('data'))->pluck('code')->all();
-        $this->assertSame([$older->code, $newer->code], $codes);
+        $this->assertSame([$older->booking->code, $newer->booking->code], $codes);
+    }
+
+    public function test_a_row_represents_one_item_not_one_booking(): void
+    {
+        $this->loginAsSuperAdmin();
+        $booking = Booking::factory()->create();
+        $serviceA = Service::factory()->create();
+        $serviceB = Service::factory()->create();
+
+        $booking->items()->create([
+            'service_id' => $serviceA->id,
+            'qty' => 1,
+            'est_weight_kg' => 3,
+            'rate' => 150,
+            'subtotal' => 450,
+            'status' => 'pending_review',
+        ]);
+        $booking->items()->create([
+            'service_id' => $serviceB->id,
+            'qty' => 1,
+            'est_weight_kg' => 2,
+            'rate' => 100,
+            'subtotal' => 200,
+            'status' => 'pending_review',
+        ]);
+
+        $response = $this->getJson('/api/v1/admin/bookings?group=draft');
+
+        $response->assertOk();
+        $codes = collect($response->json('data'))->pluck('code')->all();
+        $this->assertSame([$booking->code, $booking->code], $codes);
     }
 
     public function test_admin_with_bookings_permission_can_view_queues(): void
     {
         $this->loginAsAdminWithBookingsPermission();
-        Booking::factory()->create(['status' => 'pending_review']);
+        $this->itemWithStatus('pending_review');
 
         $this->getJson('/api/v1/admin/bookings/counts')->assertOk();
-        $this->getJson('/api/v1/admin/bookings?status=pending_review')->assertOk();
+        $this->getJson('/api/v1/admin/bookings?group=draft')->assertOk();
     }
 
     public function test_admin_without_bookings_permission_is_forbidden(): void
     {
         $this->loginAsAdminWithoutBookingsPermission();
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $item = $this->itemWithStatus('pending_review');
 
         $this->getJson('/api/v1/admin/bookings/counts')->assertForbidden();
-        $this->getJson('/api/v1/admin/bookings?status=pending_review')->assertForbidden();
-        $this->getJson("/api/v1/admin/bookings/{$booking->id}")->assertForbidden();
+        $this->getJson('/api/v1/admin/bookings?group=draft')->assertForbidden();
+        $this->getJson("/api/v1/admin/bookings/{$item->booking_id}")->assertForbidden();
     }
 
     public function test_customer_is_forbidden(): void
     {
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $item = $this->itemWithStatus('pending_review');
         $customer = User::factory()->create();
         $this->actingAs($customer);
 
-        $this->getJson("/api/v1/admin/bookings/{$booking->id}")->assertForbidden();
+        $this->getJson("/api/v1/admin/bookings/{$item->booking_id}")->assertForbidden();
 
         $this->getJson('/api/v1/admin/bookings/counts')->assertForbidden();
     }
 
     public function test_unauthenticated_is_rejected(): void
     {
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $item = $this->itemWithStatus('pending_review');
 
         $this->getJson('/api/v1/admin/bookings/counts')->assertUnauthorized();
-        $this->getJson("/api/v1/admin/bookings/{$booking->id}")->assertUnauthorized();
+        $this->getJson("/api/v1/admin/bookings/{$item->booking_id}")->assertUnauthorized();
     }
 
     public function test_detail_returns_items_and_the_full_timeline(): void
     {
         $this->loginAsSuperAdmin();
         $service = Service::factory()->create();
-        $booking = Booking::factory()->create(['status' => 'approved']);
-        $booking->items()->create([
+        $booking = Booking::factory()->create();
+        $item = $booking->items()->create([
             'service_id' => $service->id,
             'qty' => 1,
             'est_weight_kg' => 3,
             'rate' => 150,
             'subtotal' => 450,
+            'status' => 'approved',
         ]);
-        BookingStatusLog::create(['booking_id' => $booking->id, 'status' => 'pending_review']);
-        BookingStatusLog::create(['booking_id' => $booking->id, 'status' => 'approved']);
+        BookingStatusLog::create(['booking_id' => $booking->id, 'booking_item_id' => $item->id, 'status' => 'pending_review']);
+        BookingStatusLog::create(['booking_id' => $booking->id, 'booking_item_id' => $item->id, 'status' => 'approved']);
 
         $response = $this->getJson("/api/v1/admin/bookings/{$booking->id}");
 

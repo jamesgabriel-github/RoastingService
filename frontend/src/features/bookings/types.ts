@@ -17,6 +17,7 @@ export interface BookingItem {
   final_weight_kg: string | null
   rate: string
   subtotal: string
+  status: string
 }
 
 export type Fulfillment = 'pickup' | 'delivery'
@@ -24,6 +25,7 @@ export type Fulfillment = 'pickup' | 'delivery'
 export interface BookingStatusLog {
   id: number
   status: string
+  service_name: string | null
   changed_by_name: string | null
   remarks: string | null
   created_at: string
@@ -33,7 +35,7 @@ export interface Booking {
   id: number
   code: string
   is_order: boolean
-  status: string
+  status: string | null
   fulfillment: Fulfillment
   delivery_address: string | null
   shipping_fee: string

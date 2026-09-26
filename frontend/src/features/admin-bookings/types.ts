@@ -1,27 +1,36 @@
-export type QueueStatus =
-  | 'pending_review'
-  | 'pending_confirmation'
-  | 'approved'
-  | 'confirmed'
-  | 'cooking'
-  | 'ready'
-  | 'out_for_delivery'
+export type QueueGroup = 'draft' | 'pending' | 'cooking' | 'ready' | 'completed' | 'cancelled'
 
-export const QUEUE_TABS: { status: QueueStatus; label: string }[] = [
-  { status: 'pending_review', label: 'Pending review' },
-  { status: 'pending_confirmation', label: 'Pending confirmation' },
-  { status: 'approved', label: 'Awaiting drop-off' },
-  { status: 'confirmed', label: 'Confirmed' },
-  { status: 'cooking', label: 'Cooking' },
-  { status: 'ready', label: 'Ready' },
-  { status: 'out_for_delivery', label: 'Out for delivery' },
+export const QUEUE_TABS: { group: QueueGroup; label: string }[] = [
+  { group: 'draft', label: 'Draft' },
+  { group: 'pending', label: 'Pending' },
+  { group: 'cooking', label: 'Cooking' },
+  { group: 'ready', label: 'Ready' },
+  { group: 'completed', label: 'Completed' },
+  { group: 'cancelled', label: 'Cancelled' },
 ]
 
-export function parseQueueStatus(raw: string | null): QueueStatus {
-  return QUEUE_TABS.some((tab) => tab.status === raw) ? (raw as QueueStatus) : 'pending_review'
+export function parseQueueGroup(raw: string | null): QueueGroup {
+  return QUEUE_TABS.some((tab) => tab.group === raw) ? (raw as QueueGroup) : 'draft'
 }
 
-export type BookingCounts = Record<QueueStatus, number>
+export type BookingCounts = Record<QueueGroup, number>
+
+export interface AdminBookingQueueRow {
+  id: number
+  booking_id: number
+  code: string
+  is_order: boolean
+  status: string
+  service_name: string | null
+  qty: number
+  est_weight_kg: string | null
+  final_weight_kg: string | null
+  subtotal: string
+  fulfillment: 'pickup' | 'delivery'
+  customer_name: string | null
+  customer_phone: string | null
+  waiting_minutes: number
+}
 
 export interface AdminBookingItem {
   id: number
@@ -32,11 +41,23 @@ export interface AdminBookingItem {
   final_weight_kg: string | null
   rate: string
   subtotal: string
+  status: string
+  approved_at: string | null
+  approved_by_name: string | null
+  confirmed_at: string | null
+  confirmed_by_name: string | null
+  weighed_at: string | null
+  cooking_started_at: string | null
+  est_ready_at: string | null
+  completed_at: string | null
+  reject_reason: string | null
+  waiting_minutes: number
 }
 
 export interface AdminBookingStatusLog {
   id: number
   status: string
+  service_name: string | null
   changed_by_name: string | null
   remarks: string | null
   created_at: string
@@ -46,7 +67,6 @@ export interface AdminBooking {
   id: number
   code: string
   is_order: boolean
-  status: string
   fulfillment: 'pickup' | 'delivery'
   delivery_address: string | null
   customer_name: string | null
@@ -58,18 +78,8 @@ export interface AdminBooking {
   preferred_dropoff_at: string | null
   preferred_pickup_at: string | null
   dropoff_at: string | null
-  approved_at: string | null
-  approved_by_name: string | null
-  reject_reason: string | null
-  confirmed_at: string | null
-  confirmed_by_name: string | null
-  weighed_at: string | null
-  cooking_started_at: string | null
-  est_ready_at: string | null
-  completed_at: string | null
   notes: string | null
-  waiting_minutes: number
-  items?: AdminBookingItem[]
+  items: AdminBookingItem[]
   status_logs?: AdminBookingStatusLog[]
   created_at: string
 }
@@ -86,12 +96,18 @@ export interface WalkInGuestOrCustomer {
   guest_phone: string | null
 }
 
-export interface PaginatedAdminBookings {
-  data: AdminBooking[]
+export interface PaginatedAdminBookingRows {
+  data: AdminBookingQueueRow[]
   meta: {
     current_page: number
     last_page: number
   }
+}
+
+/** The status shared by every item, or `null` once they've diverged (only possible from Cooking on). */
+export function getCommonStatus(items: Pick<AdminBookingItem, 'status'>[]): string | null {
+  const statuses = new Set(items.map((item) => item.status))
+  return statuses.size === 1 ? items[0].status : null
 }
 
 const CANCELLABLE_STATUSES: Record<'false' | 'true', readonly string[]> = {
@@ -100,6 +116,10 @@ const CANCELLABLE_STATUSES: Record<'false' | 'true', readonly string[]> = {
 }
 
 /** UI-only convenience mirroring BookingStatusEngine's cancellable-from set; the server is authoritative. */
-export function isAdminCancellable(booking: Pick<AdminBooking, 'is_order' | 'status'>): boolean {
-  return CANCELLABLE_STATUSES[booking.is_order ? 'true' : 'false'].includes(booking.status)
+export function isAdminCancellable(
+  booking: Pick<AdminBooking, 'is_order'> & { items: Pick<AdminBookingItem, 'status'>[] }
+): boolean {
+  const status = getCommonStatus(booking.items)
+
+  return status !== null && CANCELLABLE_STATUSES[booking.is_order ? 'true' : 'false'].includes(status)
 }

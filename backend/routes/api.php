@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\AdminAccountController;
 use App\Http\Controllers\Api\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Api\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\Api\Admin\BookingItemController as AdminBookingItemController;
 use App\Http\Controllers\Api\Admin\BookingPaymentController;
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Admin\InventoryController as AdminInventoryController;
@@ -54,12 +55,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/bookings/{id}/weigh-in', [AdminBookingController::class, 'weighIn'])->where('id', '[0-9]{1,18}');
             Route::post('/bookings/{id}/confirm-order', [AdminBookingController::class, 'confirmOrder'])->where('id', '[0-9]{1,18}');
             Route::post('/bookings/{id}/reject-order', [AdminBookingController::class, 'rejectOrder'])->where('id', '[0-9]{1,18}');
-            Route::post('/bookings/{id}/start-cooking', [AdminBookingController::class, 'startCooking'])->where('id', '[0-9]{1,18}');
-            Route::post('/bookings/{id}/ready', [AdminBookingController::class, 'ready'])->where('id', '[0-9]{1,18}');
-            Route::post('/bookings/{id}/out-for-delivery', [AdminBookingController::class, 'outForDelivery'])->where('id', '[0-9]{1,18}');
-            Route::post('/bookings/{id}/complete', [AdminBookingController::class, 'complete'])->where('id', '[0-9]{1,18}');
             Route::post('/bookings/{id}/no-show', [AdminBookingController::class, 'noShow'])->where('id', '[0-9]{1,18}');
             Route::post('/bookings/{id}/cancel', [AdminBookingController::class, 'cancel'])->where('id', '[0-9]{1,18}');
+            Route::post('/booking-items/{id}/start-cooking', [AdminBookingItemController::class, 'startCooking'])->where('id', '[0-9]{1,18}');
+            Route::post('/booking-items/{id}/ready', [AdminBookingItemController::class, 'ready'])->where('id', '[0-9]{1,18}');
+            Route::post('/booking-items/{id}/out-for-delivery', [AdminBookingItemController::class, 'outForDelivery'])->where('id', '[0-9]{1,18}');
+            Route::post('/booking-items/{id}/complete', [AdminBookingItemController::class, 'complete'])->where('id', '[0-9]{1,18}');
         });
 
         Route::middleware(['auth:sanctum', 'role:admin,super_admin', 'module:payments'])->group(function () {

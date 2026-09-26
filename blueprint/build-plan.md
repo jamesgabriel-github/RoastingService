@@ -35,4 +35,5 @@ Replace these examples with your own features:
 - [x] 15. **Sales dashboard** - sales today/week/month from payments split by booking type, bookings by status, today's cooking/ready queue, top items and low-stock alerts
 - [x] 16. **Public landing page** - hero with Book Now, about, services cards with rates and cook times, how it works, and location/contact
 - [x] 17. **Admin sidebar navigation** - replace the admin topbar with a persistent left sidebar in a fixed order (Dashboard, Booking with a status sub-menu, Services, Inventory, Payments, Admin accounts), reusing existing per-module permission gating; booking status sub-menu items link to bookmarkable URLs on the existing bookings queue page
+- [x] 18. **Per-item booking status** - booking status moves from the booking to each booking item (a booking's items can now progress independently); admin queues regroup the raw statuses into Draft, Pending, Cooking, Ready, Completed, and a separate Cancelled tab, with the admin bookings list showing one row per item instead of per booking
 

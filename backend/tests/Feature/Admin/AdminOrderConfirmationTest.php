@@ -44,12 +44,18 @@ class AdminOrderConfirmationTest extends TestCase
         return $admin;
     }
 
-    private function shopOrder(array $attributes = []): Booking
+    private function shopOrder(array $attributes = [], string $itemStatus = 'pending_confirmation'): Booking
     {
-        return Booking::factory()->create(array_merge([
-            'is_order' => true,
-            'status' => 'pending_confirmation',
-        ], $attributes));
+        $booking = Booking::factory()->create(array_merge(['is_order' => true], $attributes));
+        $booking->items()->create([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'rate' => 150,
+            'subtotal' => 150,
+            'status' => $itemStatus,
+        ]);
+
+        return $booking->load('items');
     }
 
     public function test_confirm_succeeds_from_pending_confirmation(): void
@@ -60,15 +66,16 @@ class AdminOrderConfirmationTest extends TestCase
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/confirm-order");
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'confirmed');
-        $response->assertJsonPath('confirmed_by_name', $admin->name);
+        $response->assertJsonPath('items.0.status', 'confirmed');
+        $response->assertJsonPath('items.0.confirmed_by_name', $admin->name);
 
-        $booking->refresh();
-        $this->assertSame('confirmed', $booking->status);
-        $this->assertSame($admin->id, $booking->confirmed_by);
-        $this->assertNotNull($booking->confirmed_at);
+        $item = $booking->items->first()->fresh();
+        $this->assertSame('confirmed', $item->status);
+        $this->assertSame($admin->id, $item->confirmed_by);
+        $this->assertNotNull($item->confirmed_at);
         $this->assertDatabaseHas('booking_status_logs', [
             'booking_id' => $booking->id,
+            'booking_item_id' => $item->id,
             'status' => 'confirmed',
             'changed_by' => $admin->id,
         ]);
@@ -77,7 +84,7 @@ class AdminOrderConfirmationTest extends TestCase
     public function test_confirm_on_a_booking_not_in_pending_confirmation_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = $this->shopOrder(['status' => 'confirmed']);
+        $booking = $this->shopOrder([], 'confirmed');
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/confirm-order");
 
@@ -88,8 +95,12 @@ class AdminOrderConfirmationTest extends TestCase
     public function test_confirm_on_a_customer_supplied_booking_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create([
-            'is_order' => false,
+        $booking = Booking::factory()->create(['is_order' => false]);
+        $booking->items()->create([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'rate' => 150,
+            'subtotal' => 150,
             'status' => 'approved',
         ]);
 
@@ -102,7 +113,7 @@ class AdminOrderConfirmationTest extends TestCase
     public function test_reject_succeeds_and_releases_reserved_stock(): void
     {
         $admin = $this->loginAsSuperAdmin();
-        $booking = $this->shopOrder();
+        $booking = Booking::factory()->create(['is_order' => true]);
 
         $serviceA = Service::factory()->shopSupplied()->create(['stock_qty' => 10]);
         $serviceB = Service::factory()->shopSupplied()->create(['stock_qty' => 3]);
@@ -111,11 +122,13 @@ class AdminOrderConfirmationTest extends TestCase
             'booking_id' => $booking->id,
             'service_id' => $serviceA->id,
             'qty' => 2,
+            'status' => 'pending_confirmation',
         ]);
         BookingItem::factory()->create([
             'booking_id' => $booking->id,
             'service_id' => $serviceB->id,
             'qty' => 1,
+            'status' => 'pending_confirmation',
         ]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/reject-order", [
@@ -123,12 +136,11 @@ class AdminOrderConfirmationTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'rejected');
-        $response->assertJsonPath('reject_reason', 'Out of stock elsewhere');
+        $response->assertJsonPath('items.0.status', 'rejected');
+        $response->assertJsonPath('items.0.reject_reason', 'Out of stock elsewhere');
 
-        $booking->refresh();
-        $this->assertSame('rejected', $booking->status);
-        $this->assertSame('Out of stock elsewhere', $booking->reject_reason);
+        $items = $booking->items()->get();
+        $this->assertTrue($items->every(fn (BookingItem $item) => $item->status === 'rejected'));
         $this->assertDatabaseHas('booking_status_logs', [
             'booking_id' => $booking->id,
             'status' => 'rejected',
@@ -158,12 +170,13 @@ class AdminOrderConfirmationTest extends TestCase
     public function test_reject_on_a_booking_not_in_pending_confirmation_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = $this->shopOrder(['status' => 'confirmed']);
+        $booking = Booking::factory()->create(['is_order' => true]);
         $service = Service::factory()->shopSupplied()->create(['stock_qty' => 5]);
         BookingItem::factory()->create([
             'booking_id' => $booking->id,
             'service_id' => $service->id,
             'qty' => 2,
+            'status' => 'confirmed',
         ]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/reject-order", [
@@ -178,15 +191,13 @@ class AdminOrderConfirmationTest extends TestCase
     public function test_reject_on_a_customer_supplied_booking_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create([
-            'is_order' => false,
-            'status' => 'pending_review',
-        ]);
+        $booking = Booking::factory()->create(['is_order' => false]);
         $service = Service::factory()->create(['stock_qty' => 5]);
         BookingItem::factory()->create([
             'booking_id' => $booking->id,
             'service_id' => $service->id,
             'qty' => 2,
+            'status' => 'pending_review',
         ]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/reject-order", [

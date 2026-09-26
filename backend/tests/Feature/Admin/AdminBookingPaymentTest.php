@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Models\AdminPermission;
 use App\Models\Booking;
+use App\Models\Service;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -43,12 +44,75 @@ class AdminBookingPaymentTest extends TestCase
         return $admin;
     }
 
+    private function bookingWithItemStatus(string $status, array $bookingAttributes = []): Booking
+    {
+        $booking = Booking::factory()->create($bookingAttributes);
+        $booking->items()->create([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'est_weight_kg' => 3,
+            'rate' => 150,
+            'subtotal' => 450,
+            'status' => $status,
+        ]);
+
+        return $booking;
+    }
+
+    private function bookingWithItemStatuses(array $statuses, array $bookingAttributes = []): Booking
+    {
+        $booking = Booking::factory()->create($bookingAttributes);
+
+        foreach ($statuses as $status) {
+            $booking->items()->create([
+                'service_id' => Service::factory()->create()->id,
+                'qty' => 1,
+                'est_weight_kg' => 3,
+                'rate' => 150,
+                'subtotal' => 450,
+                'status' => $status,
+            ]);
+        }
+
+        return $booking;
+    }
+
+    public function test_a_booking_is_payable_once_every_item_has_reached_confirmed_or_later(): void
+    {
+        $this->loginAsSuperAdmin();
+        $booking = $this->bookingWithItemStatuses(['cooking', 'confirmed'], ['total_amount' => 900]);
+
+        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/payments", [
+            'method' => 'cash',
+        ]);
+
+        $response->assertOk();
+        $this->assertEquals(900.0, (float) $response->json('paid_amount'));
+        $this->assertDatabaseHas('payments', [
+            'booking_id' => $booking->id,
+            'status' => 'paid',
+        ]);
+    }
+
+    public function test_a_booking_is_not_payable_while_one_item_is_still_pending_review(): void
+    {
+        $this->loginAsSuperAdmin();
+        $booking = $this->bookingWithItemStatuses(['cooking', 'pending_review'], ['total_amount' => 900]);
+
+        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/payments", [
+            'method' => 'cash',
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['status']);
+        $this->assertDatabaseMissing('payments', ['booking_id' => $booking->id]);
+    }
+
     public function test_a_confirmed_bring_your_own_booking_can_be_paid_in_full(): void
     {
         $admin = $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create([
+        $booking = $this->bookingWithItemStatus('confirmed', [
             'is_order' => false,
-            'status' => 'confirmed',
             'total_amount' => 705,
         ]);
 
@@ -75,9 +139,8 @@ class AdminBookingPaymentTest extends TestCase
     public function test_a_confirmed_shop_supplied_booking_can_be_paid_in_full(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create([
+        $booking = $this->bookingWithItemStatus('confirmed', [
             'is_order' => true,
-            'status' => 'confirmed',
             'total_amount' => 300,
         ]);
 
@@ -101,7 +164,7 @@ class AdminBookingPaymentTest extends TestCase
     public function test_a_booking_not_yet_confirmed_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $booking = $this->bookingWithItemStatus('pending_review');
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/payments", [
             'method' => 'cash',
@@ -115,10 +178,7 @@ class AdminBookingPaymentTest extends TestCase
     public function test_a_second_payment_attempt_on_an_already_paid_booking_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create([
-            'status' => 'confirmed',
-            'total_amount' => 500,
-        ]);
+        $booking = $this->bookingWithItemStatus('confirmed', ['total_amount' => 500]);
 
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/payments", ['method' => 'cash'])->assertOk();
 
@@ -132,7 +192,7 @@ class AdminBookingPaymentTest extends TestCase
     public function test_admin_without_payments_permission_is_forbidden(): void
     {
         $this->loginAsAdminWithoutPaymentsPermission();
-        $booking = Booking::factory()->create(['status' => 'confirmed', 'total_amount' => 500]);
+        $booking = $this->bookingWithItemStatus('confirmed', ['total_amount' => 500]);
 
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/payments", ['method' => 'cash'])
             ->assertForbidden();
@@ -153,7 +213,7 @@ class AdminBookingPaymentTest extends TestCase
             'password' => 'correct-password',
         ])->assertNoContent();
 
-        $booking = Booking::factory()->create(['status' => 'confirmed', 'total_amount' => 500]);
+        $booking = $this->bookingWithItemStatus('confirmed', ['total_amount' => 500]);
 
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/payments", ['method' => 'cash'])
             ->assertOk();
@@ -161,7 +221,7 @@ class AdminBookingPaymentTest extends TestCase
 
     public function test_customer_is_forbidden(): void
     {
-        $booking = Booking::factory()->create(['status' => 'confirmed', 'total_amount' => 500]);
+        $booking = $this->bookingWithItemStatus('confirmed', ['total_amount' => 500]);
         $customer = User::factory()->create();
         $this->actingAs($customer);
 
@@ -171,7 +231,7 @@ class AdminBookingPaymentTest extends TestCase
 
     public function test_unauthenticated_is_rejected(): void
     {
-        $booking = Booking::factory()->create(['status' => 'confirmed', 'total_amount' => 500]);
+        $booking = $this->bookingWithItemStatus('confirmed', ['total_amount' => 500]);
 
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/payments", ['method' => 'cash'])
             ->assertUnauthorized();
@@ -180,7 +240,7 @@ class AdminBookingPaymentTest extends TestCase
     public function test_an_invalid_method_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'confirmed', 'total_amount' => 500]);
+        $booking = $this->bookingWithItemStatus('confirmed', ['total_amount' => 500]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/payments", ['method' => 'bank']);
 

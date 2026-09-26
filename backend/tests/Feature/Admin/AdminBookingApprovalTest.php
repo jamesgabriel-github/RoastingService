@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Booking;
+use App\Models\Service;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -16,6 +17,21 @@ class AdminBookingApprovalTest extends TestCase
         parent::setUp();
 
         $this->withHeader('Referer', 'http://localhost:5173');
+    }
+
+    private function bookingWithItemStatus(string $status, array $bookingAttributes = []): Booking
+    {
+        $booking = Booking::factory()->create($bookingAttributes);
+        $booking->items()->create([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'est_weight_kg' => 3,
+            'rate' => 150,
+            'subtotal' => 450,
+            'status' => $status,
+        ]);
+
+        return $booking->load('items');
     }
 
     private function loginAsSuperAdmin(): User
@@ -45,7 +61,7 @@ class AdminBookingApprovalTest extends TestCase
     public function test_approve_succeeds_from_pending_review(): void
     {
         $admin = $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $booking = $this->bookingWithItemStatus('pending_review');
         $dropoffAt = now()->addDays(2)->toIso8601String();
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/approve", [
@@ -53,18 +69,20 @@ class AdminBookingApprovalTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'approved');
-        $response->assertJsonPath('approved_by_name', $admin->name);
+        $response->assertJsonPath('items.0.status', 'approved');
+        $response->assertJsonPath('items.0.approved_by_name', $admin->name);
         $this->assertNotNull($response->json('dropoff_at'));
-        $this->assertNotNull($response->json('approved_at'));
+        $this->assertNotNull($response->json('items.0.approved_at'));
 
+        $item = $booking->items->first()->fresh();
         $booking->refresh();
-        $this->assertSame('approved', $booking->status);
-        $this->assertSame($admin->id, $booking->approved_by);
-        $this->assertNotNull($booking->approved_at);
+        $this->assertSame('approved', $item->status);
+        $this->assertSame($admin->id, $item->approved_by);
+        $this->assertNotNull($item->approved_at);
         $this->assertNotNull($booking->dropoff_at);
         $this->assertDatabaseHas('booking_status_logs', [
             'booking_id' => $booking->id,
+            'booking_item_id' => $item->id,
             'status' => 'approved',
             'changed_by' => $admin->id,
         ]);
@@ -73,7 +91,7 @@ class AdminBookingApprovalTest extends TestCase
     public function test_approve_on_a_booking_not_in_pending_review_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'approved']);
+        $booking = $this->bookingWithItemStatus('approved');
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/approve", [
             'dropoff_at' => now()->addDay()->toIso8601String(),
@@ -86,10 +104,7 @@ class AdminBookingApprovalTest extends TestCase
     public function test_approve_on_a_shop_supplied_booking_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create([
-            'is_order' => true,
-            'status' => 'pending_confirmation',
-        ]);
+        $booking = $this->bookingWithItemStatus('pending_confirmation', ['is_order' => true]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/approve", [
             'dropoff_at' => now()->addDay()->toIso8601String(),
@@ -102,7 +117,7 @@ class AdminBookingApprovalTest extends TestCase
     public function test_a_missing_dropoff_at_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $booking = $this->bookingWithItemStatus('pending_review');
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/approve", []);
 
@@ -113,7 +128,7 @@ class AdminBookingApprovalTest extends TestCase
     public function test_a_past_dropoff_at_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $booking = $this->bookingWithItemStatus('pending_review');
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/approve", [
             'dropoff_at' => now()->subDay()->toIso8601String(),
@@ -126,21 +141,22 @@ class AdminBookingApprovalTest extends TestCase
     public function test_reject_succeeds_and_sets_reason(): void
     {
         $admin = $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $booking = $this->bookingWithItemStatus('pending_review');
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/reject", [
             'reason' => 'Raw food quantity too small for this service',
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'rejected');
-        $response->assertJsonPath('reject_reason', 'Raw food quantity too small for this service');
+        $response->assertJsonPath('items.0.status', 'rejected');
+        $response->assertJsonPath('items.0.reject_reason', 'Raw food quantity too small for this service');
 
-        $booking->refresh();
-        $this->assertSame('rejected', $booking->status);
-        $this->assertSame('Raw food quantity too small for this service', $booking->reject_reason);
+        $item = $booking->items->first()->fresh();
+        $this->assertSame('rejected', $item->status);
+        $this->assertSame('Raw food quantity too small for this service', $item->reject_reason);
         $this->assertDatabaseHas('booking_status_logs', [
             'booking_id' => $booking->id,
+            'booking_item_id' => $item->id,
             'status' => 'rejected',
             'changed_by' => $admin->id,
             'remarks' => 'Raw food quantity too small for this service',
@@ -150,7 +166,7 @@ class AdminBookingApprovalTest extends TestCase
     public function test_reject_on_a_booking_not_in_pending_review_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'cooking']);
+        $booking = $this->bookingWithItemStatus('cooking');
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/reject", [
             'reason' => 'Too late to reject now',
@@ -163,10 +179,7 @@ class AdminBookingApprovalTest extends TestCase
     public function test_reject_on_a_shop_supplied_booking_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create([
-            'is_order' => true,
-            'status' => 'pending_confirmation',
-        ]);
+        $booking = $this->bookingWithItemStatus('pending_confirmation', ['is_order' => true]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/reject", [
             'reason' => 'Not a bring-your-own booking',
@@ -174,14 +187,14 @@ class AdminBookingApprovalTest extends TestCase
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['status']);
-        $booking->refresh();
-        $this->assertSame('pending_confirmation', $booking->status);
+        $item = $booking->items->first()->fresh();
+        $this->assertSame('pending_confirmation', $item->status);
     }
 
     public function test_a_missing_reason_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $booking = $this->bookingWithItemStatus('pending_review');
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/reject", []);
 
@@ -192,7 +205,7 @@ class AdminBookingApprovalTest extends TestCase
     public function test_admin_without_bookings_permission_is_forbidden(): void
     {
         $this->loginAsAdminWithoutBookingsPermission();
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $booking = $this->bookingWithItemStatus('pending_review');
 
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/approve", [
             'dropoff_at' => now()->addDay()->toIso8601String(),
@@ -205,7 +218,7 @@ class AdminBookingApprovalTest extends TestCase
 
     public function test_customer_is_forbidden(): void
     {
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $booking = $this->bookingWithItemStatus('pending_review');
         $customer = User::factory()->create();
         $this->actingAs($customer);
 
@@ -220,7 +233,7 @@ class AdminBookingApprovalTest extends TestCase
 
     public function test_unauthenticated_is_rejected(): void
     {
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $booking = $this->bookingWithItemStatus('pending_review');
 
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/approve", [
             'dropoff_at' => now()->addDay()->toIso8601String(),

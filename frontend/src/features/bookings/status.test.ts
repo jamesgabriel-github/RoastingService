@@ -13,18 +13,27 @@ describe('humanizeStatus', () => {
 
 describe('isCancellable', () => {
   it('is true for a pending_review non-order booking', () => {
-    expect(isCancellable({ is_order: false, status: 'pending_review' })).toBe(true)
+    expect(isCancellable({ is_order: false, items: [{ status: 'pending_review' }] })).toBe(true)
   })
 
   it('is false once a non-order booking is cooking', () => {
-    expect(isCancellable({ is_order: false, status: 'cooking' })).toBe(false)
+    expect(isCancellable({ is_order: false, items: [{ status: 'cooking' }] })).toBe(false)
   })
 
   it('is true for a pending_confirmation order booking', () => {
-    expect(isCancellable({ is_order: true, status: 'pending_confirmation' })).toBe(true)
+    expect(isCancellable({ is_order: true, items: [{ status: 'pending_confirmation' }] })).toBe(true)
   })
 
   it('is false for a completed booking', () => {
-    expect(isCancellable({ is_order: true, status: 'completed' })).toBe(false)
+    expect(isCancellable({ is_order: true, items: [{ status: 'completed' }] })).toBe(false)
+  })
+
+  it('is false once a booking\'s items have diverged', () => {
+    expect(
+      isCancellable({
+        is_order: false,
+        items: [{ status: 'cooking' }, { status: 'confirmed' }],
+      })
+    ).toBe(false)
   })
 })

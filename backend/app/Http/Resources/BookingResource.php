@@ -22,7 +22,7 @@ class BookingResource extends JsonResource
             'id' => $this->id,
             'code' => $this->code,
             'is_order' => $this->is_order,
-            'status' => $this->status,
+            'status' => $this->whenLoaded('items', fn () => $this->commonStatus()),
             'fulfillment' => $this->fulfillment,
             'delivery_address' => $this->delivery_address,
             'shipping_fee' => $this->shipping_fee,

@@ -124,7 +124,7 @@ class MyBookingsTest extends TestCase
 
         $response->assertOk();
         $response->assertJson(['status' => 'cancelled']);
-        $this->assertDatabaseHas('bookings', ['id' => $booking->id, 'status' => 'cancelled']);
+        $this->assertDatabaseHas('booking_items', ['booking_id' => $booking->id, 'status' => 'cancelled']);
         $this->assertDatabaseHas('booking_status_logs', ['booking_id' => $booking->id, 'status' => 'cancelled']);
 
         $logs = $response->json('status_logs');
@@ -187,8 +187,13 @@ class MyBookingsTest extends TestCase
     public function test_cancelling_once_cooking_is_rejected(): void
     {
         $customer = User::factory()->completeProfile()->create();
-        $booking = Booking::factory()->create([
-            'customer_id' => $customer->id,
+        $booking = Booking::factory()->create(['customer_id' => $customer->id]);
+        $booking->items()->create([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'est_weight_kg' => 2,
+            'rate' => 150,
+            'subtotal' => 300,
             'status' => 'cooking',
         ]);
         $this->actingAsCustomer($customer);
@@ -196,7 +201,7 @@ class MyBookingsTest extends TestCase
         $response = $this->postJson("/api/v1/bookings/{$booking->id}/cancel");
 
         $response->assertUnprocessable();
-        $this->assertDatabaseHas('bookings', ['id' => $booking->id, 'status' => 'cooking']);
+        $this->assertDatabaseHas('booking_items', ['booking_id' => $booking->id, 'status' => 'cooking']);
         $this->assertDatabaseCount('booking_status_logs', 0);
     }
 

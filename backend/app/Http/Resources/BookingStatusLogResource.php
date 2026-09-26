@@ -21,6 +21,7 @@ class BookingStatusLogResource extends JsonResource
         return [
             'id' => $this->id,
             'status' => $this->status,
+            'service_name' => $this->whenLoaded('item', fn () => $this->item?->service?->name),
             'changed_by_name' => $this->whenLoaded('changer', fn () => $this->changer?->name),
             'remarks' => $this->remarks,
             'created_at' => $this->created_at,

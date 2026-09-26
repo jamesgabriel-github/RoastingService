@@ -28,7 +28,7 @@ export function MyBookingsPage() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p>{humanizeStatus(booking.status)}</p>
+                  <p>{booking.status ? humanizeStatus(booking.status) : 'Mixed'}</p>
                   <p className="text-sm text-muted-foreground">
                     {formatCurrency(
                       booking.is_order ? (booking.total_amount ?? 0) : booking.estimated_total

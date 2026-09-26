@@ -29,6 +29,7 @@ class BookingItemFactory extends Factory
             'est_weight_kg' => $weight,
             'rate' => $rate,
             'subtotal' => round($rate * $weight, 2),
+            'status' => 'pending_review',
         ];
     }
 }

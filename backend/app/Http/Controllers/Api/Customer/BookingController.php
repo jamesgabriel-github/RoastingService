@@ -30,7 +30,10 @@ class BookingController extends Controller
     public function show(Request $request, int $id): BookingResource
     {
         $booking = Booking::where('customer_id', $request->user()->id)
-            ->with(['items.service', 'statusLogs' => fn ($query) => $query->orderBy('id')->with('changer')])
+            ->with([
+                'items.service',
+                'statusLogs' => fn ($query) => $query->orderBy('id')->with(['changer', 'item.service']),
+            ])
             ->findOrFail($id);
 
         return new BookingResource($booking);
@@ -44,7 +47,9 @@ class BookingController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($id);
 
-            if (! $statusEngine->isAllowed($booking->is_order, $booking->status, 'cancelled')) {
+            $commonStatus = $booking->commonStatus();
+
+            if ($commonStatus === null || ! $statusEngine->isAllowed($booking->is_order, $commonStatus, 'cancelled')) {
                 throw ValidationException::withMessages([
                     'status' => 'This booking can no longer be cancelled.',
                 ]);
@@ -66,13 +71,19 @@ class BookingController extends Controller
                 }
             }
 
-            $statusEngine->transition($booking, 'cancelled');
+            foreach ($booking->items as $item) {
+                $item->setRelation('booking', $booking);
+                $statusEngine->transition($item, 'cancelled');
+            }
 
             return $booking;
         });
 
         return new BookingResource(
-            $booking->load(['items.service', 'statusLogs' => fn ($query) => $query->orderBy('id')->with('changer')])
+            $booking->load([
+                'items.service',
+                'statusLogs' => fn ($query) => $query->orderBy('id')->with(['changer', 'item.service']),
+            ])
         );
     }
 
@@ -116,11 +127,13 @@ class BookingController extends Controller
                 'notes' => $request->validated('notes'),
             ]);
 
-            foreach ($itemsData as $itemData) {
-                $booking->items()->create($itemData);
-            }
+            $initialStatus = $statusEngine->initialStatusFor(false);
 
-            $statusEngine->transition($booking, $statusEngine->initialStatusFor(false));
+            foreach ($itemsData as $itemData) {
+                $item = $booking->items()->create($itemData);
+                $item->setRelation('booking', $booking);
+                $statusEngine->transition($item, $initialStatus);
+            }
 
             return $booking;
         });

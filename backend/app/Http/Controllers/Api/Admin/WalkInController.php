@@ -89,25 +89,27 @@ class WalkInController extends Controller
                 'estimated_total' => round($totalAmount, 2),
                 'total_amount' => round($totalAmount, 2),
                 'notes' => $request->validated('notes'),
-                'approved_at' => $now,
-                'approved_by' => $request->user()->id,
-                'weighed_at' => $now,
-                'confirmed_at' => $now,
-                'confirmed_by' => $request->user()->id,
             ]);
 
             foreach ($itemsData as $itemData) {
-                $booking->items()->create($itemData);
-            }
+                $item = $booking->items()->create(array_merge($itemData, [
+                    'approved_at' => $now,
+                    'approved_by' => $request->user()->id,
+                    'weighed_at' => $now,
+                    'confirmed_at' => $now,
+                    'confirmed_by' => $request->user()->id,
+                ]));
+                $item->setRelation('booking', $booking);
 
-            $statusEngine->transition($booking, 'pending_review', $request->user()->id);
-            $statusEngine->transition($booking, 'approved', $request->user()->id);
-            $statusEngine->transition($booking, 'confirmed', $request->user()->id);
+                $statusEngine->transition($item, 'pending_review', $request->user()->id);
+                $statusEngine->transition($item, 'approved', $request->user()->id);
+                $statusEngine->transition($item, 'confirmed', $request->user()->id);
+            }
 
             return $booking;
         });
 
-        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
+        return new AdminBookingResource($booking->load(BookingController::detailEagerLoads()));
     }
 
     public function storeShop(
@@ -177,17 +179,18 @@ class WalkInController extends Controller
                 'estimated_total' => round($totalAmount, 2),
                 'total_amount' => round($totalAmount, 2),
                 'notes' => $request->validated('notes'),
-                'confirmed_at' => $now,
-                'confirmed_by' => $request->user()->id,
             ]);
 
             foreach ($itemsData as $itemData) {
-                $booking->items()->create([
+                $item = $booking->items()->create([
                     'service_id' => $itemData['service_id'],
                     'qty' => $itemData['qty'],
                     'rate' => $itemData['rate'],
                     'subtotal' => $itemData['subtotal'],
+                    'confirmed_at' => $now,
+                    'confirmed_by' => $request->user()->id,
                 ]);
+                $item->setRelation('booking', $booking);
 
                 InventoryLog::create([
                     'service_id' => $itemData['service_id'],
@@ -196,29 +199,14 @@ class WalkInController extends Controller
                     'booking_id' => $booking->id,
                     'created_by' => $request->user()->id,
                 ]);
-            }
 
-            $statusEngine->transition($booking, 'pending_confirmation', $request->user()->id);
-            $statusEngine->transition($booking, 'confirmed', $request->user()->id);
+                $statusEngine->transition($item, 'pending_confirmation', $request->user()->id);
+                $statusEngine->transition($item, 'confirmed', $request->user()->id);
+            }
 
             return $booking;
         });
 
-        return new AdminBookingResource($booking->load(self::detailEagerLoads()));
-    }
-
-    /**
-     * @return array<int|string, string|\Closure>
-     */
-    private static function detailEagerLoads(): array
-    {
-        return [
-            'items.service',
-            'customer',
-            'latestStatusLog',
-            'statusLogs' => fn ($query) => $query->orderBy('id')->with('changer'),
-            'approver',
-            'confirmer',
-        ];
+        return new AdminBookingResource($booking->load(BookingController::detailEagerLoads()));
     }
 }

@@ -81,13 +81,17 @@ class OrderController extends Controller
                 'notes' => $request->validated('notes'),
             ]);
 
+            $initialStatus = $statusEngine->initialStatusFor(true);
+
             foreach ($itemsData as $itemData) {
-                $booking->items()->create([
+                $item = $booking->items()->create([
                     'service_id' => $itemData['service_id'],
                     'qty' => $itemData['qty'],
                     'rate' => $itemData['rate'],
                     'subtotal' => $itemData['subtotal'],
                 ]);
+                $item->setRelation('booking', $booking);
+                $statusEngine->transition($item, $initialStatus);
 
                 InventoryLog::create([
                     'service_id' => $itemData['service_id'],
@@ -97,8 +101,6 @@ class OrderController extends Controller
                     'created_by' => $customerId,
                 ]);
             }
-
-            $statusEngine->transition($booking, $statusEngine->initialStatusFor(true));
 
             return $booking;
         });

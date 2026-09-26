@@ -62,24 +62,25 @@ class AdminWalkInBookingTest extends TestCase
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('status', 'confirmed');
+        $response->assertJsonPath('items.0.status', 'confirmed');
         $response->assertJsonPath('is_order', false);
         $response->assertJsonPath('total_amount', '375.00');
-        $this->assertNotNull($response->json('approved_at'));
-        $this->assertNotNull($response->json('weighed_at'));
-        $this->assertNotNull($response->json('confirmed_at'));
+        $this->assertNotNull($response->json('items.0.approved_at'));
+        $this->assertNotNull($response->json('items.0.weighed_at'));
+        $this->assertNotNull($response->json('items.0.confirmed_at'));
         $this->assertNotNull($response->json('dropoff_at'));
 
         $booking = Booking::first();
+        $item = $booking->items->first();
         $this->assertSame($customer->id, $booking->customer_id);
         $this->assertNull($booking->guest_name);
         $this->assertNull($booking->guest_phone);
-        $this->assertSame('confirmed', $booking->status);
+        $this->assertSame('confirmed', $item->status);
         $this->assertSame('375.00', $booking->total_amount);
 
-        $this->assertDatabaseHas('booking_status_logs', ['booking_id' => $booking->id, 'status' => 'pending_review']);
-        $this->assertDatabaseHas('booking_status_logs', ['booking_id' => $booking->id, 'status' => 'approved', 'changed_by' => $admin->id]);
-        $this->assertDatabaseHas('booking_status_logs', ['booking_id' => $booking->id, 'status' => 'confirmed', 'changed_by' => $admin->id]);
+        $this->assertDatabaseHas('booking_status_logs', ['booking_id' => $booking->id, 'booking_item_id' => $item->id, 'status' => 'pending_review']);
+        $this->assertDatabaseHas('booking_status_logs', ['booking_id' => $booking->id, 'booking_item_id' => $item->id, 'status' => 'approved', 'changed_by' => $admin->id]);
+        $this->assertDatabaseHas('booking_status_logs', ['booking_id' => $booking->id, 'booking_item_id' => $item->id, 'status' => 'confirmed', 'changed_by' => $admin->id]);
         $this->assertSame(3, $booking->statusLogs()->count());
     }
 
@@ -122,14 +123,16 @@ class AdminWalkInBookingTest extends TestCase
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('status', 'confirmed');
+        $response->assertJsonPath('items.0.status', 'confirmed');
+        $response->assertJsonPath('items.1.status', 'confirmed');
         $response->assertJsonPath('is_order', true);
         $response->assertJsonPath('total_amount', '250.00');
 
         $booking = Booking::first();
+        $item = $booking->items->first();
         $this->assertSame($customer->id, $booking->customer_id);
-        $this->assertSame($admin->id, $booking->confirmed_by);
-        $this->assertNotNull($booking->confirmed_at);
+        $this->assertSame($admin->id, $item->confirmed_by);
+        $this->assertNotNull($item->confirmed_at);
 
         $this->assertSame(8, $serviceA->fresh()->stock_qty);
         $this->assertSame(4, $serviceB->fresh()->stock_qty);
@@ -149,9 +152,9 @@ class AdminWalkInBookingTest extends TestCase
             'created_by' => $admin->id,
         ]);
 
-        $this->assertDatabaseHas('booking_status_logs', ['booking_id' => $booking->id, 'status' => 'pending_confirmation']);
-        $this->assertDatabaseHas('booking_status_logs', ['booking_id' => $booking->id, 'status' => 'confirmed', 'changed_by' => $admin->id]);
-        $this->assertSame(2, $booking->statusLogs()->count());
+        $this->assertDatabaseHas('booking_status_logs', ['booking_id' => $booking->id, 'booking_item_id' => $item->id, 'status' => 'pending_confirmation']);
+        $this->assertDatabaseHas('booking_status_logs', ['booking_id' => $booking->id, 'booking_item_id' => $item->id, 'status' => 'confirmed', 'changed_by' => $admin->id]);
+        $this->assertSame(4, $booking->statusLogs()->count());
     }
 
     public function test_shop_walk_in_for_a_guest_succeeds(): void

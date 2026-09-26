@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/currency'
 import { useAdminBookings, useBookingCounts } from './hooks'
-import { parseQueueStatus, QUEUE_TABS } from './types'
-import type { QueueStatus } from './types'
+import { parseQueueGroup, QUEUE_TABS } from './types'
+import type { QueueGroup } from './types'
 import { formatWaitingTime } from './waitingTime'
 
 function todayDateString(): string {
@@ -16,16 +16,16 @@ function todayDateString(): string {
 
 export function AdminBookingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const status = parseQueueStatus(searchParams.get('status'))
+  const group = parseQueueGroup(searchParams.get('group'))
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [date, setDate] = useState(todayDateString)
   const { data: counts } = useBookingCounts()
-  const { data, isLoading } = useAdminBookings(status, search, page, date)
+  const { data, isLoading } = useAdminBookings(group, search, page, date)
 
-  const selectTab = (next: QueueStatus) => {
+  const selectTab = (next: QueueGroup) => {
     setSearchParams((params) => {
-      params.set('status', next)
+      params.set('group', next)
       return params
     })
     setPage(1)
@@ -43,12 +43,12 @@ export function AdminBookingsPage() {
       <div className="flex flex-wrap gap-2">
         {QUEUE_TABS.map((tab) => (
           <Button
-            key={tab.status}
+            key={tab.group}
             size="sm"
-            variant={status === tab.status ? 'default' : 'outline'}
-            onClick={() => selectTab(tab.status)}
+            variant={group === tab.group ? 'default' : 'outline'}
+            onClick={() => selectTab(tab.group)}
           >
-            {tab.label} ({counts?.[tab.status] ?? 0})
+            {tab.label} ({counts?.[tab.group] ?? 0})
           </Button>
         ))}
       </div>
@@ -85,26 +85,26 @@ export function AdminBookingsPage() {
                 <th className="p-2">Code</th>
                 <th className="p-2">Customer</th>
                 <th className="p-2">Type</th>
+                <th className="p-2">Service</th>
                 <th className="p-2">Total</th>
                 <th className="p-2">Waiting</th>
                 <th className="p-2"></th>
               </tr>
             </thead>
             <tbody>
-              {data.data.map((booking) => (
-                <tr key={booking.id} className="border-b">
-                  <td className="p-2 font-mono">{booking.code}</td>
+              {data.data.map((row) => (
+                <tr key={row.id} className="border-b">
+                  <td className="p-2 font-mono">{row.code}</td>
                   <td className="p-2">
-                    <div>{booking.customer_name ?? '—'}</div>
-                    <div className="text-sm text-muted-foreground">{booking.customer_phone ?? '—'}</div>
+                    <div>{row.customer_name ?? '—'}</div>
+                    <div className="text-sm text-muted-foreground">{row.customer_phone ?? '—'}</div>
                   </td>
-                  <td className="p-2">{booking.is_order ? 'Is order' : 'Not order'}</td>
+                  <td className="p-2">{row.is_order ? 'Is order' : 'Not order'}</td>
+                  <td className="p-2">{row.service_name}</td>
+                  <td className="p-2">{formatCurrency(row.subtotal)}</td>
+                  <td className="p-2">{formatWaitingTime(row.waiting_minutes)}</td>
                   <td className="p-2">
-                    {formatCurrency(booking.is_order ? (booking.total_amount ?? 0) : booking.estimated_total)}
-                  </td>
-                  <td className="p-2">{formatWaitingTime(booking.waiting_minutes)}</td>
-                  <td className="p-2">
-                    <Link to={`/admin/bookings/${booking.id}`} className="text-primary underline-offset-4 hover:underline">
+                    <Link to={`/admin/bookings/${row.booking_id}`} className="text-primary underline-offset-4 hover:underline">
                       View
                     </Link>
                   </td>

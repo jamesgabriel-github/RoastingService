@@ -59,11 +59,20 @@ carries the product rules and edge cases that list doesn't capture.
 
 **Customer-supplied**
 ```
-Booked -> Pending review -> Approved (drop-off scheduled)
+Booked -> Pending review -> Awaiting drop-off (drop-off scheduled)
   -> Confirmed (weighed in, final price) -> Cooking
   -> Ready (pickup) / Out for delivery -> Completed
 Exits: Rejected, No-show, Cancelled (before Cooking)
 ```
+
+Status is tracked per booking item, not per booking - items on the same
+booking move through drop-off/confirmation together (one intake event), but
+diverge independently from Cooking onward (e.g. one item can be Cooking while
+a sibling item is still Confirmed/Pending). The admin queues group the raw
+statuses into: **Draft** (Pending review, Pending confirmation, Awaiting
+drop-off), **Pending** (Confirmed - walk-ins land here by default), **Cooking**,
+**Ready** (Ready, Out for delivery), **Completed**, and a separate
+**Cancelled** tab (Rejected, Cancelled, No-show).
 
 **Shop-supplied**
 ```
@@ -102,8 +111,12 @@ Exits: Rejected / Cancelled -> stock released
 - **Inventory:** stock per piece, restock/adjust, full change log, low-stock
   indicator
 - **Booking management:**
-  - Queues: Pending review, Pending confirmation, Awaiting drop-off, Cooking,
-    Ready, Out for delivery
+  - Queues, grouped: Draft (Pending review, Pending confirmation, Awaiting
+    drop-off), Pending (Confirmed), Cooking, Ready (incl. Out for delivery),
+    Completed, and a separate Cancelled tab (Rejected, Cancelled, No-show).
+    Since status is per item, the queue list shows one row per booking item,
+    not per booking - a booking with several items can appear in more than
+    one queue at once.
   - Approve (set drop-off) / reject (with reason)
   - Weigh-in: enter actual raw kg -> final price -> Confirmed
   - Confirm shop orders
@@ -206,17 +219,22 @@ id, service_id, change_qty (+/-), reason (`restock` | `reserve` | `release` |
 ### `bookings`
 id, code (e.g. `RS-0001`), customer_id (nullable for walk-ins), guest_name,
 guest_phone, source_type (`customer_supplied` | `shop_supplied`), fulfillment
-(`pickup` | `delivery`), delivery_address, shipping_fee (default 0), status,
-preferred_dropoff_at, dropoff_at, approved_at, approved_by, confirmed_at,
-confirmed_by, weighed_at, cooking_started_at, est_ready_at, completed_at,
-estimated_total, total_amount, notes, reject_reason, timestamps
+(`pickup` | `delivery`), delivery_address, shipping_fee (default 0),
+preferred_dropoff_at, dropoff_at, estimated_total, total_amount, notes,
+timestamps
 
 ### `booking_items`
 id, booking_id, service_id, qty, est_weight_kg, final_weight_kg, rate
-(snapshot), subtotal
+(snapshot), subtotal, status, approved_at, approved_by, confirmed_at,
+confirmed_by, weighed_at, cooking_started_at, est_ready_at, completed_at,
+reject_reason
+
+> Status and its transition timestamps/actors moved here from `bookings`:
+> a booking's items can now be at different stages independently, so there is
+> no longer one status per booking.
 
 ### `booking_status_logs`
-id, booking_id, status, changed_by, remarks, created_at
+id, booking_id, booking_item_id, status, changed_by, remarks, created_at
 
 ### `payments`
 id, booking_id, type (`full` | `downpayment` | `balance`), amount, method
@@ -320,9 +338,10 @@ monetized product. No ads, subscriptions, or transaction fees are planned.
 - **Desktop/tablet-first**, sidebar navigation
 - Dashboard: summary cards (sales, pending, cooking, ready, low stock) + sales
   chart
-- Booking management as **tabbed queues** by status with counts, a data table
-  with search/filters, and quick actions (Approve, Weigh in, Confirm, Start
-  cooking, Mark ready)
+- Booking management as **tabbed queues** by status group (Draft, Pending,
+  Cooking, Ready, Completed, Cancelled) with counts, a data table listing one
+  row per booking item (not per booking) with search/filters, and quick
+  actions (Approve, Weigh in, Confirm, Start cooking, Mark ready)
 - Weigh-in as a focused dialog: kg input -> live final price -> confirm
 - Show waiting time on pending items and warn on low stock
 

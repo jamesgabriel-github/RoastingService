@@ -51,41 +51,58 @@ class AdminBookingFulfillmentTest extends TestCase
 
     private function shopOrder(array $attributes = []): Booking
     {
-        return Booking::factory()->create(array_merge([
-            'is_order' => true,
-            'status' => 'pending_confirmation',
-        ], $attributes));
+        return Booking::factory()->create(array_merge(['is_order' => true], $attributes));
+    }
+
+    /**
+     * Create a booking with a single item at `$status`.
+     */
+    private function itemWithStatus(string $status, array $bookingAttributes = [], array $itemAttributes = []): BookingItem
+    {
+        $booking = $this->booking($bookingAttributes);
+        $service = Service::factory()->create();
+
+        return $booking->items()->create(array_merge([
+            'service_id' => $service->id,
+            'qty' => 1,
+            'est_weight_kg' => 3,
+            'rate' => 150,
+            'subtotal' => 450,
+            'status' => $status,
+        ], $itemAttributes));
     }
 
     // --- start-cooking -----------------------------------------------------
 
-    public function test_start_cooking_succeeds_from_confirmed_and_uses_the_longest_item(): void
+    public function test_start_cooking_succeeds_from_confirmed_and_uses_the_items_own_service(): void
     {
         $admin = $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'confirmed']);
+        $booking = $this->booking();
 
         $shortService = Service::factory()->create(['est_minutes' => 30]);
         $longService = Service::factory()->create(['est_minutes' => 90]);
 
-        BookingItem::factory()->create(['booking_id' => $booking->id, 'service_id' => $shortService->id]);
-        BookingItem::factory()->create(['booking_id' => $booking->id, 'service_id' => $longService->id]);
+        BookingItem::factory()->create(['booking_id' => $booking->id, 'service_id' => $shortService->id, 'status' => 'confirmed']);
+        $longItem = BookingItem::factory()->create(['booking_id' => $booking->id, 'service_id' => $longService->id, 'status' => 'confirmed']);
 
-        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/start-cooking");
+        $response = $this->postJson("/api/v1/admin/booking-items/{$longItem->id}/start-cooking");
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'cooking');
+        $respondedItem = collect($response->json('items'))->firstWhere('id', $longItem->id);
+        $this->assertSame('cooking', $respondedItem['status']);
 
-        $booking->refresh();
-        $this->assertSame('cooking', $booking->status);
-        $this->assertNotNull($booking->cooking_started_at);
-        $this->assertNotNull($booking->est_ready_at);
+        $longItem->refresh();
+        $this->assertSame('cooking', $longItem->status);
+        $this->assertNotNull($longItem->cooking_started_at);
+        $this->assertNotNull($longItem->est_ready_at);
         $this->assertEqualsWithDelta(
-            $booking->cooking_started_at->addMinutes(90)->timestamp,
-            $booking->est_ready_at->timestamp,
+            $longItem->cooking_started_at->addMinutes(90)->timestamp,
+            $longItem->est_ready_at->timestamp,
             1
         );
         $this->assertDatabaseHas('booking_status_logs', [
             'booking_id' => $booking->id,
+            'booking_item_id' => $longItem->id,
             'status' => 'cooking',
             'changed_by' => $admin->id,
         ]);
@@ -94,29 +111,61 @@ class AdminBookingFulfillmentTest extends TestCase
     public function test_start_cooking_from_a_shop_order_confirmed_also_succeeds(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = $this->shopOrder(['status' => 'confirmed']);
+        $booking = $this->shopOrder();
         $service = Service::factory()->shopSupplied()->create(['est_minutes' => 45]);
-        BookingItem::factory()->create(['booking_id' => $booking->id, 'service_id' => $service->id]);
+        $item = BookingItem::factory()->create(['booking_id' => $booking->id, 'service_id' => $service->id, 'status' => 'confirmed']);
 
-        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/start-cooking");
+        $response = $this->postJson("/api/v1/admin/booking-items/{$item->id}/start-cooking");
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'cooking');
+        $response->assertJsonPath('items.0.status', 'cooking');
     }
 
     public function test_start_cooking_from_another_status_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'approved']);
+        $item = $this->itemWithStatus('approved');
 
-        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/start-cooking");
+        $response = $this->postJson("/api/v1/admin/booking-items/{$item->id}/start-cooking");
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['status']);
 
-        $booking->refresh();
-        $this->assertSame('approved', $booking->status);
-        $this->assertNull($booking->cooking_started_at);
+        $item->refresh();
+        $this->assertSame('approved', $item->status);
+        $this->assertNull($item->cooking_started_at);
+    }
+
+    public function test_two_items_on_the_same_booking_can_be_at_different_fulfillment_stages(): void
+    {
+        $admin = $this->loginAsSuperAdmin();
+        $booking = $this->booking(['fulfillment' => 'pickup']);
+        $serviceA = Service::factory()->create();
+        $serviceB = Service::factory()->create();
+
+        $itemA = BookingItem::factory()->create(['booking_id' => $booking->id, 'service_id' => $serviceA->id, 'status' => 'confirmed']);
+        $itemB = BookingItem::factory()->create(['booking_id' => $booking->id, 'service_id' => $serviceB->id, 'status' => 'confirmed']);
+
+        $this->postJson("/api/v1/admin/booking-items/{$itemA->id}/start-cooking")->assertOk();
+
+        $itemA->refresh();
+        $itemB->refresh();
+        $this->assertSame('cooking', $itemA->status);
+        $this->assertSame('confirmed', $itemB->status);
+
+        $response = $this->postJson("/api/v1/admin/booking-items/{$itemA->id}/ready");
+        $response->assertOk();
+
+        $itemA->refresh();
+        $itemB->refresh();
+        $this->assertSame('ready', $itemA->status);
+        $this->assertSame('confirmed', $itemB->status);
+        $this->assertDatabaseHas('booking_status_logs', [
+            'booking_id' => $booking->id,
+            'booking_item_id' => $itemA->id,
+            'status' => 'ready',
+            'changed_by' => $admin->id,
+        ]);
     }
 
     // --- ready / out-for-delivery -------------------------------------------
@@ -124,14 +173,15 @@ class AdminBookingFulfillmentTest extends TestCase
     public function test_ready_succeeds_from_cooking_on_a_pickup_booking(): void
     {
         $admin = $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'cooking', 'fulfillment' => 'pickup']);
+        $item = $this->itemWithStatus('cooking', ['fulfillment' => 'pickup']);
 
-        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/ready");
+        $response = $this->postJson("/api/v1/admin/booking-items/{$item->id}/ready");
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'ready');
+        $response->assertJsonPath('items.0.status', 'ready');
         $this->assertDatabaseHas('booking_status_logs', [
-            'booking_id' => $booking->id,
+            'booking_id' => $item->booking_id,
+            'booking_item_id' => $item->id,
             'status' => 'ready',
             'changed_by' => $admin->id,
         ]);
@@ -140,28 +190,29 @@ class AdminBookingFulfillmentTest extends TestCase
     public function test_ready_on_a_delivery_booking_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'cooking', 'fulfillment' => 'delivery']);
+        $item = $this->itemWithStatus('cooking', ['fulfillment' => 'delivery', 'delivery_address' => '123 Test St']);
 
-        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/ready");
+        $response = $this->postJson("/api/v1/admin/booking-items/{$item->id}/ready");
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['status']);
 
-        $booking->refresh();
-        $this->assertSame('cooking', $booking->status);
+        $item->refresh();
+        $this->assertSame('cooking', $item->status);
     }
 
     public function test_out_for_delivery_succeeds_from_cooking_on_a_delivery_booking(): void
     {
         $admin = $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'cooking', 'fulfillment' => 'delivery']);
+        $item = $this->itemWithStatus('cooking', ['fulfillment' => 'delivery', 'delivery_address' => '123 Test St']);
 
-        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/out-for-delivery");
+        $response = $this->postJson("/api/v1/admin/booking-items/{$item->id}/out-for-delivery");
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'out_for_delivery');
+        $response->assertJsonPath('items.0.status', 'out_for_delivery');
         $this->assertDatabaseHas('booking_status_logs', [
-            'booking_id' => $booking->id,
+            'booking_id' => $item->booking_id,
+            'booking_item_id' => $item->id,
             'status' => 'out_for_delivery',
             'changed_by' => $admin->id,
         ]);
@@ -170,15 +221,15 @@ class AdminBookingFulfillmentTest extends TestCase
     public function test_out_for_delivery_on_a_pickup_booking_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'cooking', 'fulfillment' => 'pickup']);
+        $item = $this->itemWithStatus('cooking', ['fulfillment' => 'pickup']);
 
-        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/out-for-delivery");
+        $response = $this->postJson("/api/v1/admin/booking-items/{$item->id}/out-for-delivery");
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['status']);
 
-        $booking->refresh();
-        $this->assertSame('cooking', $booking->status);
+        $item->refresh();
+        $this->assertSame('cooking', $item->status);
     }
 
     // --- complete ------------------------------------------------------------
@@ -186,18 +237,19 @@ class AdminBookingFulfillmentTest extends TestCase
     public function test_complete_succeeds_from_ready(): void
     {
         $admin = $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'ready', 'fulfillment' => 'pickup']);
+        $item = $this->itemWithStatus('ready', ['fulfillment' => 'pickup']);
 
-        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/complete");
+        $response = $this->postJson("/api/v1/admin/booking-items/{$item->id}/complete");
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'completed');
+        $response->assertJsonPath('items.0.status', 'completed');
 
-        $booking->refresh();
-        $this->assertSame('completed', $booking->status);
-        $this->assertNotNull($booking->completed_at);
+        $item->refresh();
+        $this->assertSame('completed', $item->status);
+        $this->assertNotNull($item->completed_at);
         $this->assertDatabaseHas('booking_status_logs', [
-            'booking_id' => $booking->id,
+            'booking_id' => $item->booking_id,
+            'booking_item_id' => $item->id,
             'status' => 'completed',
             'changed_by' => $admin->id,
         ]);
@@ -206,23 +258,23 @@ class AdminBookingFulfillmentTest extends TestCase
     public function test_complete_succeeds_from_out_for_delivery(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'out_for_delivery', 'fulfillment' => 'delivery']);
+        $item = $this->itemWithStatus('out_for_delivery', ['fulfillment' => 'delivery', 'delivery_address' => '123 Test St']);
 
-        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/complete");
+        $response = $this->postJson("/api/v1/admin/booking-items/{$item->id}/complete");
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'completed');
+        $response->assertJsonPath('items.0.status', 'completed');
 
-        $booking->refresh();
-        $this->assertNotNull($booking->completed_at);
+        $item->refresh();
+        $this->assertNotNull($item->completed_at);
     }
 
     public function test_complete_from_an_earlier_status_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'cooking']);
+        $item = $this->itemWithStatus('cooking');
 
-        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/complete");
+        $response = $this->postJson("/api/v1/admin/booking-items/{$item->id}/complete");
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['status']);
@@ -233,19 +285,28 @@ class AdminBookingFulfillmentTest extends TestCase
     public function test_no_show_succeeds_from_approved_on_a_customer_supplied_booking(): void
     {
         $admin = $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'approved']);
+        $booking = $this->booking();
+        $booking->items()->create([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'est_weight_kg' => 3,
+            'rate' => 150,
+            'subtotal' => 450,
+            'status' => 'approved',
+        ]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/no-show", [
             'remarks' => 'Did not drop off raw food',
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'no_show');
+        $response->assertJsonPath('items.0.status', 'no_show');
 
-        $booking->refresh();
-        $this->assertSame('no_show', $booking->status);
+        $item = $booking->items->first()->fresh();
+        $this->assertSame('no_show', $item->status);
         $this->assertDatabaseHas('booking_status_logs', [
             'booking_id' => $booking->id,
+            'booking_item_id' => $item->id,
             'status' => 'no_show',
             'changed_by' => $admin->id,
             'remarks' => 'Did not drop off raw food',
@@ -255,7 +316,14 @@ class AdminBookingFulfillmentTest extends TestCase
     public function test_no_show_on_a_shop_supplied_booking_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = $this->shopOrder(['status' => 'confirmed']);
+        $booking = $this->shopOrder();
+        $booking->items()->create([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'rate' => 150,
+            'subtotal' => 450,
+            'status' => 'confirmed',
+        ]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/no-show");
 
@@ -266,7 +334,14 @@ class AdminBookingFulfillmentTest extends TestCase
     public function test_no_show_from_another_byo_status_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'confirmed']);
+        $booking = $this->booking();
+        $booking->items()->create([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'rate' => 150,
+            'subtotal' => 450,
+            'status' => 'confirmed',
+        ]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/no-show");
 
@@ -281,14 +356,21 @@ class AdminBookingFulfillmentTest extends TestCase
         $this->loginAsSuperAdmin();
 
         foreach (['pending_review', 'approved', 'confirmed'] as $status) {
-            $booking = $this->booking(['status' => $status]);
+            $booking = $this->booking();
+            $booking->items()->create([
+                'service_id' => Service::factory()->create()->id,
+                'qty' => 1,
+                'rate' => 150,
+                'subtotal' => 450,
+                'status' => $status,
+            ]);
 
             $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/cancel", [
                 'remarks' => 'Customer requested cancellation',
             ]);
 
             $response->assertOk();
-            $response->assertJsonPath('status', 'cancelled');
+            $response->assertJsonPath('items.0.status', 'cancelled');
         }
     }
 
@@ -297,12 +379,19 @@ class AdminBookingFulfillmentTest extends TestCase
         $this->loginAsSuperAdmin();
 
         foreach (['pending_confirmation', 'confirmed'] as $status) {
-            $booking = $this->shopOrder(['status' => $status]);
+            $booking = $this->shopOrder();
+            $booking->items()->create([
+                'service_id' => Service::factory()->create()->id,
+                'qty' => 1,
+                'rate' => 150,
+                'subtotal' => 450,
+                'status' => $status,
+            ]);
 
             $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/cancel");
 
             $response->assertOk();
-            $response->assertJsonPath('status', 'cancelled');
+            $response->assertJsonPath('items.0.status', 'cancelled');
         }
     }
 
@@ -311,15 +400,22 @@ class AdminBookingFulfillmentTest extends TestCase
         $this->loginAsSuperAdmin();
 
         foreach (['cooking', 'ready', 'out_for_delivery', 'completed', 'rejected', 'no_show', 'cancelled'] as $status) {
-            $booking = $this->booking(['status' => $status]);
+            $booking = $this->booking();
+            $item = $booking->items()->create([
+                'service_id' => Service::factory()->create()->id,
+                'qty' => 1,
+                'rate' => 150,
+                'subtotal' => 450,
+                'status' => $status,
+            ]);
 
             $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/cancel");
 
             $response->assertUnprocessable();
             $response->assertJsonValidationErrors(['status']);
 
-            $booking->refresh();
-            $this->assertSame($status, $booking->status);
+            $item->refresh();
+            $this->assertSame($status, $item->status);
         }
     }
 
@@ -335,17 +431,19 @@ class AdminBookingFulfillmentTest extends TestCase
             'booking_id' => $booking->id,
             'service_id' => $serviceA->id,
             'qty' => 2,
+            'status' => 'confirmed',
         ]);
         BookingItem::factory()->create([
             'booking_id' => $booking->id,
             'service_id' => $serviceB->id,
             'qty' => 1,
+            'status' => 'confirmed',
         ]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/cancel");
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'cancelled');
+        $response->assertJsonPath('items.0.status', 'cancelled');
 
         $this->assertSame(12, $serviceA->fresh()->stock_qty);
         $this->assertSame(4, $serviceB->fresh()->stock_qty);
@@ -369,12 +467,13 @@ class AdminBookingFulfillmentTest extends TestCase
     public function test_cancel_on_a_customer_supplied_booking_leaves_stock_and_inventory_logs_untouched(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = $this->booking(['status' => 'confirmed']);
+        $booking = $this->booking();
         $service = Service::factory()->create(['stock_qty' => 5]);
         BookingItem::factory()->create([
             'booking_id' => $booking->id,
             'service_id' => $service->id,
             'qty' => 2,
+            'status' => 'confirmed',
         ]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/cancel");
@@ -392,38 +491,41 @@ class AdminBookingFulfillmentTest extends TestCase
     public function test_admin_without_bookings_permission_is_forbidden(): void
     {
         $this->loginAsAdminWithoutBookingsPermission();
-        $booking = $this->booking(['status' => 'confirmed']);
+        $item = $this->itemWithStatus('confirmed');
+        $booking = $item->booking;
 
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/start-cooking")->assertForbidden();
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/ready")->assertForbidden();
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/out-for-delivery")->assertForbidden();
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/complete")->assertForbidden();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/start-cooking")->assertForbidden();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/ready")->assertForbidden();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/out-for-delivery")->assertForbidden();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/complete")->assertForbidden();
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/no-show")->assertForbidden();
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/cancel")->assertForbidden();
     }
 
     public function test_customer_is_forbidden(): void
     {
-        $booking = $this->booking(['status' => 'confirmed']);
+        $item = $this->itemWithStatus('confirmed');
+        $booking = $item->booking;
         $customer = User::factory()->create();
         $this->actingAs($customer);
 
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/start-cooking")->assertForbidden();
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/ready")->assertForbidden();
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/out-for-delivery")->assertForbidden();
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/complete")->assertForbidden();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/start-cooking")->assertForbidden();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/ready")->assertForbidden();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/out-for-delivery")->assertForbidden();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/complete")->assertForbidden();
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/no-show")->assertForbidden();
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/cancel")->assertForbidden();
     }
 
     public function test_unauthenticated_is_rejected(): void
     {
-        $booking = $this->booking(['status' => 'confirmed']);
+        $item = $this->itemWithStatus('confirmed');
+        $booking = $item->booking;
 
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/start-cooking")->assertUnauthorized();
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/ready")->assertUnauthorized();
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/out-for-delivery")->assertUnauthorized();
-        $this->postJson("/api/v1/admin/bookings/{$booking->id}/complete")->assertUnauthorized();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/start-cooking")->assertUnauthorized();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/ready")->assertUnauthorized();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/out-for-delivery")->assertUnauthorized();
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/complete")->assertUnauthorized();
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/no-show")->assertUnauthorized();
         $this->postJson("/api/v1/admin/bookings/{$booking->id}/cancel")->assertUnauthorized();
     }
@@ -432,14 +534,14 @@ class AdminBookingFulfillmentTest extends TestCase
     {
         $this->loginAsSuperAdmin();
 
-        $this->postJson('/api/v1/admin/bookings/999999/start-cooking')->assertNotFound();
-        $this->postJson('/api/v1/admin/bookings/abc/start-cooking')->assertNotFound();
-        $this->postJson('/api/v1/admin/bookings/999999/ready')->assertNotFound();
-        $this->postJson('/api/v1/admin/bookings/abc/ready')->assertNotFound();
-        $this->postJson('/api/v1/admin/bookings/999999/out-for-delivery')->assertNotFound();
-        $this->postJson('/api/v1/admin/bookings/abc/out-for-delivery')->assertNotFound();
-        $this->postJson('/api/v1/admin/bookings/999999/complete')->assertNotFound();
-        $this->postJson('/api/v1/admin/bookings/abc/complete')->assertNotFound();
+        $this->postJson('/api/v1/admin/booking-items/999999/start-cooking')->assertNotFound();
+        $this->postJson('/api/v1/admin/booking-items/abc/start-cooking')->assertNotFound();
+        $this->postJson('/api/v1/admin/booking-items/999999/ready')->assertNotFound();
+        $this->postJson('/api/v1/admin/booking-items/abc/ready')->assertNotFound();
+        $this->postJson('/api/v1/admin/booking-items/999999/out-for-delivery')->assertNotFound();
+        $this->postJson('/api/v1/admin/booking-items/abc/out-for-delivery')->assertNotFound();
+        $this->postJson('/api/v1/admin/booking-items/999999/complete')->assertNotFound();
+        $this->postJson('/api/v1/admin/booking-items/abc/complete')->assertNotFound();
         $this->postJson('/api/v1/admin/bookings/999999/no-show')->assertNotFound();
         $this->postJson('/api/v1/admin/bookings/abc/no-show')->assertNotFound();
         $this->postJson('/api/v1/admin/bookings/999999/cancel')->assertNotFound();

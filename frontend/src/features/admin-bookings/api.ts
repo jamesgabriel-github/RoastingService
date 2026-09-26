@@ -2,8 +2,8 @@ import { api, ensureCsrfCookie } from '@/lib/api'
 import type {
   AdminBooking,
   BookingCounts,
-  PaginatedAdminBookings,
-  QueueStatus,
+  PaginatedAdminBookingRows,
+  QueueGroup,
   WalkInCustomer,
   WalkInGuestOrCustomer,
 } from './types'
@@ -35,13 +35,13 @@ export async function fetchBookingCounts(): Promise<BookingCounts> {
 }
 
 export async function fetchAdminBookings(
-  status: QueueStatus,
+  group: QueueGroup,
   search: string,
   page: number,
   date: string
-): Promise<PaginatedAdminBookings> {
-  const { data } = await api.get<PaginatedAdminBookings>('/admin/bookings', {
-    params: { status, search: search.trim() || undefined, page, date },
+): Promise<PaginatedAdminBookingRows> {
+  const { data } = await api.get<PaginatedAdminBookingRows>('/admin/bookings', {
+    params: { group, search: search.trim() || undefined, page, date },
   })
   return data
 }
@@ -81,27 +81,27 @@ export async function rejectOrder(id: number, payload: RejectPayload): Promise<A
   return data
 }
 
-export async function startCooking(id: number): Promise<AdminBooking> {
+export async function startCooking(itemId: number): Promise<AdminBooking> {
   await ensureCsrfCookie()
-  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/start-cooking`)
+  const { data } = await api.post<AdminBooking>(`/admin/booking-items/${itemId}/start-cooking`)
   return data
 }
 
-export async function markReady(id: number): Promise<AdminBooking> {
+export async function markReady(itemId: number): Promise<AdminBooking> {
   await ensureCsrfCookie()
-  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/ready`)
+  const { data } = await api.post<AdminBooking>(`/admin/booking-items/${itemId}/ready`)
   return data
 }
 
-export async function markOutForDelivery(id: number): Promise<AdminBooking> {
+export async function markOutForDelivery(itemId: number): Promise<AdminBooking> {
   await ensureCsrfCookie()
-  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/out-for-delivery`)
+  const { data } = await api.post<AdminBooking>(`/admin/booking-items/${itemId}/out-for-delivery`)
   return data
 }
 
-export async function completeBooking(id: number): Promise<AdminBooking> {
+export async function completeBooking(itemId: number): Promise<AdminBooking> {
   await ensureCsrfCookie()
-  const { data } = await api.post<AdminBooking>(`/admin/bookings/${id}/complete`)
+  const { data } = await api.post<AdminBooking>(`/admin/booking-items/${itemId}/complete`)
   return data
 }
 

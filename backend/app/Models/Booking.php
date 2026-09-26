@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'code',
@@ -19,22 +18,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'fulfillment',
     'delivery_address',
     'shipping_fee',
-    'status',
     'preferred_dropoff_at',
     'preferred_pickup_at',
     'dropoff_at',
-    'approved_at',
-    'approved_by',
-    'confirmed_at',
-    'confirmed_by',
-    'weighed_at',
-    'cooking_started_at',
-    'est_ready_at',
-    'completed_at',
     'estimated_total',
     'total_amount',
     'notes',
-    'reject_reason',
 ])]
 class Booking extends Model
 {
@@ -54,12 +43,6 @@ class Booking extends Model
             'preferred_dropoff_at' => 'datetime',
             'preferred_pickup_at' => 'datetime',
             'dropoff_at' => 'datetime',
-            'approved_at' => 'datetime',
-            'confirmed_at' => 'datetime',
-            'weighed_at' => 'datetime',
-            'cooking_started_at' => 'datetime',
-            'est_ready_at' => 'datetime',
-            'completed_at' => 'datetime',
         ];
     }
 
@@ -69,22 +52,6 @@ class Booking extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'customer_id');
-    }
-
-    /**
-     * @return BelongsTo<User, $this>
-     */
-    public function approver(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'approved_by');
-    }
-
-    /**
-     * @return BelongsTo<User, $this>
-     */
-    public function confirmer(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'confirmed_by');
     }
 
     /**
@@ -112,10 +79,14 @@ class Booking extends Model
     }
 
     /**
-     * @return HasOne<BookingStatusLog, $this>
+     * The status shared by every one of this booking's items, or `null` once
+     * they've diverged (only possible from Cooking on). Requires `items` to
+     * already be loaded.
      */
-    public function latestStatusLog(): HasOne
+    public function commonStatus(): ?string
     {
-        return $this->hasOne(BookingStatusLog::class)->latestOfMany();
+        $statuses = $this->items->pluck('status')->unique();
+
+        return $statuses->count() === 1 ? $statuses->first() : null;
     }
 }

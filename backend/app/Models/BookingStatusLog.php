@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'booking_id',
+    'booking_item_id',
     'status',
     'changed_by',
     'remarks',
@@ -37,6 +38,14 @@ class BookingStatusLog extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    /**
+     * @return BelongsTo<BookingItem, $this>
+     */
+    public function item(): BelongsTo
+    {
+        return $this->belongsTo(BookingItem::class, 'booking_item_id');
     }
 
     /**

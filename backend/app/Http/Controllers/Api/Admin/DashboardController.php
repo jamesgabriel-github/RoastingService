@@ -71,7 +71,7 @@ class DashboardController extends Controller
      */
     private function bookingsByStatus(): array
     {
-        $counts = Booking::selectRaw('status, count(*) as aggregate')
+        $counts = BookingItem::selectRaw('status, count(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status');
 
@@ -85,21 +85,21 @@ class DashboardController extends Controller
      */
     private function activeQueue(): array
     {
-        return Booking::whereIn('status', ['cooking', 'ready'])
-            ->with(['customer', 'latestStatusLog'])
+        return BookingItem::whereIn('status', ['cooking', 'ready'])
+            ->with(['booking.customer', 'latestStatusLog'])
             ->get()
-            ->map(fn (Booking $booking) => [
-                'id' => $booking->id,
-                'code' => $booking->code,
-                'is_order' => $booking->is_order,
-                'status' => $booking->status,
-                'customer_name' => $booking->customer
-                    ? trim("{$booking->customer->first_name} {$booking->customer->last_name}")
-                    : $booking->guest_name,
-                'fulfillment' => $booking->fulfillment,
-                'cooking_started_at' => $booking->cooking_started_at,
-                'est_ready_at' => $booking->est_ready_at,
-                'waiting_minutes' => (int) now()->diffInMinutes($booking->latestStatusLog?->created_at ?? $booking->created_at, absolute: true),
+            ->map(fn (BookingItem $item) => [
+                'id' => $item->id,
+                'code' => $item->booking->code,
+                'is_order' => $item->booking->is_order,
+                'status' => $item->status,
+                'customer_name' => $item->booking->customer
+                    ? trim("{$item->booking->customer->first_name} {$item->booking->customer->last_name}")
+                    : $item->booking->guest_name,
+                'fulfillment' => $item->booking->fulfillment,
+                'cooking_started_at' => $item->cooking_started_at,
+                'est_ready_at' => $item->est_ready_at,
+                'waiting_minutes' => (int) now()->diffInMinutes($item->latestStatusLog?->created_at ?? $item->booking->created_at, absolute: true),
             ])
             ->values()
             ->all();
@@ -111,9 +111,8 @@ class DashboardController extends Controller
     private function topItems(): array
     {
         return BookingItem::query()
-            ->join('bookings', 'bookings.id', '=', 'booking_items.booking_id')
             ->join('services', 'services.id', '=', 'booking_items.service_id')
-            ->where('bookings.status', 'completed')
+            ->where('booking_items.status', 'completed')
             ->selectRaw('booking_items.service_id, services.name, sum(booking_items.qty) as qty_sold')
             ->groupBy('booking_items.service_id', 'services.name')
             ->orderByDesc('qty_sold')

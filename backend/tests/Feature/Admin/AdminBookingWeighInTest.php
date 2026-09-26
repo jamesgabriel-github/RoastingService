@@ -48,7 +48,7 @@ class AdminBookingWeighInTest extends TestCase
      */
     private function createApprovedBookingWithTwoItems(): array
     {
-        $booking = Booking::factory()->create(['status' => 'approved']);
+        $booking = Booking::factory()->create();
         $serviceA = Service::factory()->create();
         $serviceB = Service::factory()->create();
 
@@ -58,6 +58,7 @@ class AdminBookingWeighInTest extends TestCase
             'est_weight_kg' => 3,
             'rate' => 150,
             'subtotal' => 450,
+            'status' => 'approved',
         ]);
 
         $itemB = $booking->items()->create([
@@ -66,6 +67,7 @@ class AdminBookingWeighInTest extends TestCase
             'est_weight_kg' => 2,
             'rate' => 100,
             'subtotal' => 200,
+            'status' => 'approved',
         ]);
 
         return [$booking, $itemA, $itemB];
@@ -84,8 +86,8 @@ class AdminBookingWeighInTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('status', 'confirmed');
-        $response->assertJsonPath('confirmed_by_name', $admin->name);
+        $response->assertJsonPath('items.0.status', 'confirmed');
+        $response->assertJsonPath('items.0.confirmed_by_name', $admin->name);
         // 150 * 3.5 = 525.00, 100 * 1.8 = 180.00, total = 705.00
         $this->assertEquals(705.0, (float) $response->json('total_amount'));
 
@@ -93,17 +95,19 @@ class AdminBookingWeighInTest extends TestCase
         $itemA->refresh();
         $itemB->refresh();
 
-        $this->assertSame('confirmed', $booking->status);
+        $this->assertSame('confirmed', $itemA->status);
+        $this->assertSame('confirmed', $itemB->status);
         $this->assertEquals(705.0, (float) $booking->total_amount);
         $this->assertEquals(3.5, (float) $itemA->final_weight_kg);
         $this->assertEquals(525.0, (float) $itemA->subtotal);
         $this->assertEquals(1.8, (float) $itemB->final_weight_kg);
         $this->assertEquals(180.0, (float) $itemB->subtotal);
-        $this->assertNotNull($booking->weighed_at);
-        $this->assertNotNull($booking->confirmed_at);
-        $this->assertSame($admin->id, $booking->confirmed_by);
+        $this->assertNotNull($itemA->weighed_at);
+        $this->assertNotNull($itemA->confirmed_at);
+        $this->assertSame($admin->id, $itemA->confirmed_by);
         $this->assertDatabaseHas('booking_status_logs', [
             'booking_id' => $booking->id,
+            'booking_item_id' => $itemA->id,
             'status' => 'confirmed',
             'changed_by' => $admin->id,
         ]);
@@ -112,7 +116,7 @@ class AdminBookingWeighInTest extends TestCase
     public function test_weigh_in_on_a_booking_not_in_approved_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create(['status' => 'pending_review']);
+        $booking = Booking::factory()->create();
         $service = Service::factory()->create();
         $item = $booking->items()->create([
             'service_id' => $service->id,
@@ -120,6 +124,7 @@ class AdminBookingWeighInTest extends TestCase
             'est_weight_kg' => 3,
             'rate' => 150,
             'subtotal' => 450,
+            'status' => 'pending_review',
         ]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/weigh-in", [
@@ -133,16 +138,14 @@ class AdminBookingWeighInTest extends TestCase
     public function test_weigh_in_on_a_shop_supplied_booking_is_rejected(): void
     {
         $this->loginAsSuperAdmin();
-        $booking = Booking::factory()->create([
-            'is_order' => true,
-            'status' => 'pending_confirmation',
-        ]);
+        $booking = Booking::factory()->create(['is_order' => true]);
         $service = Service::factory()->create();
         $item = $booking->items()->create([
             'service_id' => $service->id,
             'qty' => 3,
             'rate' => 250,
             'subtotal' => 750,
+            'status' => 'pending_confirmation',
         ]);
 
         $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/weigh-in", [
@@ -151,9 +154,8 @@ class AdminBookingWeighInTest extends TestCase
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['status']);
-        $booking->refresh();
         $item->refresh();
-        $this->assertSame('pending_confirmation', $booking->status);
+        $this->assertSame('pending_confirmation', $item->status);
         $this->assertEquals(750.0, (float) $item->subtotal);
     }
 
@@ -177,7 +179,7 @@ class AdminBookingWeighInTest extends TestCase
     {
         $this->loginAsSuperAdmin();
         [$booking, $itemA, $itemB] = $this->createApprovedBookingWithTwoItems();
-        $otherBookingItem = Booking::factory()->create(['status' => 'approved']);
+        $otherBookingItem = Booking::factory()->create();
         $service = Service::factory()->create();
         $foreignItem = $otherBookingItem->items()->create([
             'service_id' => $service->id,

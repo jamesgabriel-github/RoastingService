@@ -28,7 +28,7 @@ import {
   startCooking,
   weighInBooking,
 } from './api'
-import type { QueueStatus } from './types'
+import type { QueueGroup } from './types'
 
 export function useBookingCounts() {
   return useQuery({
@@ -37,10 +37,10 @@ export function useBookingCounts() {
   })
 }
 
-export function useAdminBookings(status: QueueStatus, search: string, page: number, date: string) {
+export function useAdminBookings(group: QueueGroup, search: string, page: number, date: string) {
   return useQuery({
-    queryKey: ['admin-bookings', status, search, page, date],
-    queryFn: () => fetchAdminBookings(status, search, page, date),
+    queryKey: ['admin-bookings', group, search, page, date],
+    queryFn: () => fetchAdminBookings(group, search, page, date),
   })
 }
 
@@ -110,8 +110,8 @@ export function useStartCooking() {
   const invalidate = useBookingActionInvalidation()
 
   return useMutation({
-    mutationFn: (id: number) => startCooking(id),
-    onSuccess: (_data, id) => invalidate(id),
+    mutationFn: (itemId: number) => startCooking(itemId),
+    onSuccess: (booking) => invalidate(booking.id),
   })
 }
 
@@ -119,8 +119,8 @@ export function useMarkReady() {
   const invalidate = useBookingActionInvalidation()
 
   return useMutation({
-    mutationFn: (id: number) => markReady(id),
-    onSuccess: (_data, id) => invalidate(id),
+    mutationFn: (itemId: number) => markReady(itemId),
+    onSuccess: (booking) => invalidate(booking.id),
   })
 }
 
@@ -128,8 +128,8 @@ export function useMarkOutForDelivery() {
   const invalidate = useBookingActionInvalidation()
 
   return useMutation({
-    mutationFn: (id: number) => markOutForDelivery(id),
-    onSuccess: (_data, id) => invalidate(id),
+    mutationFn: (itemId: number) => markOutForDelivery(itemId),
+    onSuccess: (booking) => invalidate(booking.id),
   })
 }
 
@@ -137,8 +137,8 @@ export function useCompleteBooking() {
   const invalidate = useBookingActionInvalidation()
 
   return useMutation({
-    mutationFn: (id: number) => completeBooking(id),
-    onSuccess: (_data, id) => invalidate(id),
+    mutationFn: (itemId: number) => completeBooking(itemId),
+    onSuccess: (booking) => invalidate(booking.id),
   })
 }
 

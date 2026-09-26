@@ -1,6 +1,6 @@
 # Roasting Service - Project Overview
 
-<!-- blueprint:source-hash 6e14365be3c599a3011c1ae816e172077b067a78d0905d07320dfe7312695338 -->
+<!-- blueprint:source-hash 76ea2640e00452bc5c29e167398fc0a3b08fbb8003f9659683e869e88dd2af44 -->
 
 > A booking and inventory system for a roasting shop: customers book roasting
 > for their own raw food or order roasted items from shop stock, and admins run
@@ -44,7 +44,8 @@ treat as unknown rather than assuming enterprise or hostile-user constraints.
 
 Headline feature: **Bring-your-own booking** (6) plus its shared booking-status
 engine - this is the core of the product and everything downstream (queues,
-weigh-in, cooking, payments, dashboard) is built on it.
+weigh-in, cooking, payments, dashboard) is built on it. Feature 18 moves that
+status from the booking onto each booking item.
 
 1. **Auth & roles** *(shipped)* - separate `/admin` login (email + password,
    seeded accounts) and customer login (mobile-number-only, v2 adds SMS
@@ -70,6 +71,7 @@ weigh-in, cooking, payments, dashboard) is built on it.
 15. **Sales dashboard** - sales today/week/month by booking type, bookings by status, today's cooking/ready queue, top items, low-stock alerts.
 16. **Public landing page** - hero + Book Now, about, services cards, how it works, location/contact.
 17. **Admin sidebar navigation** - persistent left sidebar (Dashboard, Booking with a status sub-menu, Services, Inventory, Payments, Admin accounts) replacing the admin topbar, reusing existing per-module permission gating; booking status sub-menu items link to bookmarkable URLs on the existing bookings queue page.
+18. **Per-item booking status** - status moves from the booking to each booking item, so a booking's items can progress independently from Cooking onward; admin queues regroup the raw statuses into Draft, Pending, Cooking, Ready, Completed, and a separate Cancelled tab, with the admin bookings list showing one row per item instead of per booking.
 
 ## Data model
 
@@ -109,19 +111,23 @@ weigh-in, cooking, payments, dashboard) is built on it.
 - `customer_id` (nullable -> `users`, for walk-ins), `guest_name`, `guest_phone`
 - `source_type` (enum: `customer_supplied` | `shop_supplied`)
 - `fulfillment` (enum: `pickup` | `delivery`), `delivery_address`, `shipping_fee` (numeric, default 0)
-- `status` (enum, see status flows below)
-- `preferred_dropoff_at`, `dropoff_at`, `approved_at`, `approved_by` -> `users`
-- `confirmed_at`, `confirmed_by` -> `users`, `weighed_at`
-- `cooking_started_at`, `est_ready_at`, `completed_at`
-- `estimated_total` (numeric), `total_amount` (numeric), `notes`, `reject_reason`
+- `preferred_dropoff_at`, `dropoff_at`
+- `estimated_total` (numeric), `total_amount` (numeric), `notes`
 
 ### `booking_items`
 - `id`, `booking_id` -> `bookings`, `service_id` -> `services`
 - `qty` (int), `est_weight_kg` (numeric, nullable), `final_weight_kg` (numeric, nullable)
 - `rate` (numeric, snapshot of the service rate/price at booking time), `subtotal` (numeric)
+- `status` (enum, see status flows below)
+- `approved_at`, `approved_by` -> `users`, `confirmed_at`, `confirmed_by` -> `users`
+- `weighed_at`, `cooking_started_at`, `est_ready_at`, `completed_at`, `reject_reason`
+
+> Status and its transition timestamps/actors live here, not on `bookings`
+> (feature 18): a booking's items intake together but can be at different
+> stages independently from Cooking onward.
 
 ### `booking_status_logs`
-- `id`, `booking_id` -> `bookings`, `status`, `changed_by` -> `users`, `remarks`, `created_at`
+- `id`, `booking_id` -> `bookings`, `booking_item_id` -> `booking_items`, `status`, `changed_by` -> `users`, `remarks`, `created_at`
 
 ### `payments`
 - `id`, `booking_id` -> `bookings`
@@ -139,9 +145,16 @@ weigh-in, cooking, payments, dashboard) is built on it.
 > `delivery_address` on `bookings` is separate from a customer's profile
 > `address` - entered per-order, not reused from the profile (yet).
 
-**Status flows** (`bookings.status`):
-- Customer-supplied: `Booked -> Pending review -> Approved -> Confirmed -> Cooking -> Ready|Out for delivery -> Completed`, with exits to `Rejected`, `No-show`, `Cancelled` (only before Cooking).
+**Status flows** (`booking_items.status`, moved from `bookings` in feature 18 -
+a booking's items intake together but diverge independently from Cooking on):
+- Customer-supplied: `Booked -> Pending review -> Awaiting drop-off -> Confirmed -> Cooking -> Ready|Out for delivery -> Completed`, with exits to `Rejected`, `No-show`, `Cancelled` (only before Cooking).
 - Shop-supplied: `Placed -> Pending confirmation -> Confirmed -> Cooking -> Ready|Out for delivery -> Completed`, with exits to `Rejected`/`Cancelled` (stock released).
+
+Admin queue groups: **Draft** (Pending review, Pending confirmation, Awaiting
+drop-off), **Pending** (Confirmed - walk-ins land here by default),
+**Cooking**, **Ready** (Ready, Out for delivery), **Completed**, and a
+separate **Cancelled** tab (Rejected, Cancelled, No-show). The admin bookings
+list shows one row per item, not per booking.
 
 ## Tech stack
 
@@ -184,7 +197,7 @@ Currency as PHP (Peso) with two decimals; weights in kg with up to two decimals.
 Main screens (exact route paths not yet decided for unbuilt features):
 - Public: landing/hero, services list, how-it-works, location/contact, customer login (`/login`).
 - Customer: profile setup (`/profile-setup`, first login only), new-booking step flow (type -> items -> pickup/delivery -> review), my-bookings list + detail (status timeline), account/profile (`/account`).
-- Admin: separate `/admin` login, tabbed booking queues, booking detail, services table, inventory log, walk-in form, payments list, sales dashboard, admin-account management (super admin only).
+- Admin: separate `/admin` login, tabbed booking queues grouped by status (Draft/Pending/Cooking/Ready/Completed/Cancelled, one row per item), booking detail, services table, inventory log, walk-in form, payments list, sales dashboard, admin-account management (super admin only).
 
 ## Deployment
 

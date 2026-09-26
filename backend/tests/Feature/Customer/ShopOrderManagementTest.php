@@ -46,7 +46,6 @@ class ShopOrderManagementTest extends TestCase
         $this->assertDatabaseHas('bookings', [
             'code' => $code,
             'customer_id' => $customer->id,
-            'status' => 'pending_confirmation',
             'total_amount' => 750,
         ]);
         $this->assertDatabaseHas('booking_items', [
@@ -54,6 +53,7 @@ class ShopOrderManagementTest extends TestCase
             'qty' => 3,
             'rate' => 250,
             'subtotal' => 750,
+            'status' => 'pending_confirmation',
         ]);
         $this->assertDatabaseHas('services', ['id' => $service->id, 'stock_qty' => 7]);
 

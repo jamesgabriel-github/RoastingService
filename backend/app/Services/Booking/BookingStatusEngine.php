@@ -2,7 +2,7 @@
 
 namespace App\Services\Booking;
 
-use App\Models\Booking;
+use App\Models\BookingItem;
 use App\Models\BookingStatusLog;
 use InvalidArgumentException;
 
@@ -48,25 +48,28 @@ class BookingStatusEngine
     }
 
     /**
-     * Move `$booking` to `$to`, persist it, and record the status log entry.
+     * Move `$item` to `$to`, persist it, and record the status log entry.
      * Expected to run inside the caller's transaction.
      */
-    public function transition(Booking $booking, string $to, ?int $changedBy = null, ?string $remarks = null): void
+    public function transition(BookingItem $item, string $to, ?int $changedBy = null, ?string $remarks = null): void
     {
-        if (! $this->isAllowed($booking->is_order, $booking->status, $to)) {
-            $from = $booking->status ?? 'creation';
-            $label = $booking->is_order ? 'order' : 'non-order';
+        $isOrder = $item->booking->is_order;
+
+        if (! $this->isAllowed($isOrder, $item->status, $to)) {
+            $from = $item->status ?? 'creation';
+            $label = $isOrder ? 'order' : 'non-order';
 
             throw new InvalidArgumentException(
-                "Cannot move a {$label} booking from {$from} to {$to}."
+                "Cannot move a {$label} booking item from {$from} to {$to}."
             );
         }
 
-        $booking->status = $to;
-        $booking->save();
+        $item->status = $to;
+        $item->save();
 
         BookingStatusLog::create([
-            'booking_id' => $booking->id,
+            'booking_id' => $item->booking_id,
+            'booking_item_id' => $item->id,
             'status' => $to,
             'changed_by' => $changedBy,
             'remarks' => $remarks,

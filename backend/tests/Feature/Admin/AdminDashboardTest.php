@@ -75,13 +75,14 @@ class AdminDashboardTest extends TestCase
             'is_active' => false,
         ]);
 
-        $todayBooking = Booking::factory()->create(['is_order' => false, 'status' => 'completed']);
+        $todayBooking = Booking::factory()->create(['is_order' => false]);
         $todayBooking->items()->create([
             'service_id' => $serviceA->id,
             'qty' => 5,
             'est_weight_kg' => 3,
             'rate' => 150,
             'subtotal' => 450,
+            'status' => 'completed',
         ]);
         Payment::factory()->create([
             'booking_id' => $todayBooking->id,
@@ -90,7 +91,14 @@ class AdminDashboardTest extends TestCase
             'paid_at' => now()->subHours(2),
         ]);
 
-        $weekBooking = Booking::factory()->create(['is_order' => true, 'status' => 'completed']);
+        $weekBooking = Booking::factory()->create(['is_order' => true]);
+        $weekBooking->items()->create([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'rate' => 150,
+            'subtotal' => 150,
+            'status' => 'completed',
+        ]);
         Payment::factory()->create([
             'booking_id' => $weekBooking->id,
             'amount' => 50,
@@ -98,13 +106,14 @@ class AdminDashboardTest extends TestCase
             'paid_at' => $weekStart->copy()->addHours(3),
         ]);
 
-        $monthBooking = Booking::factory()->create(['is_order' => false, 'status' => 'completed']);
+        $monthBooking = Booking::factory()->create(['is_order' => false]);
         $monthBooking->items()->create([
             'service_id' => $serviceB->id,
             'qty' => 3,
             'est_weight_kg' => 2,
             'rate' => 150,
             'subtotal' => 300,
+            'status' => 'completed',
         ]);
         Payment::factory()->create([
             'booking_id' => $monthBooking->id,
@@ -113,7 +122,14 @@ class AdminDashboardTest extends TestCase
             'paid_at' => $monthStart->copy()->addHours(3),
         ]);
 
-        $olderBooking = Booking::factory()->create(['is_order' => true, 'status' => 'completed']);
+        $olderBooking = Booking::factory()->create(['is_order' => true]);
+        $olderBooking->items()->create([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'rate' => 150,
+            'subtotal' => 150,
+            'status' => 'completed',
+        ]);
         Payment::factory()->create([
             'booking_id' => $olderBooking->id,
             'amount' => 999,
@@ -121,23 +137,37 @@ class AdminDashboardTest extends TestCase
             'paid_at' => $monthStart->copy()->subDays(5),
         ]);
 
-        Booking::factory()->count(2)->create(['status' => 'pending_review']);
+        collect(range(1, 2))->each(function () {
+            $booking = Booking::factory()->create();
+            $booking->items()->create([
+                'service_id' => Service::factory()->create()->id,
+                'qty' => 1,
+                'rate' => 150,
+                'subtotal' => 150,
+                'status' => 'pending_review',
+            ]);
+        });
 
-        $cookingBooking = Booking::factory()->create([
-            'status' => 'cooking',
-            'created_at' => now()->subMinutes(12),
-            'cooking_started_at' => now()->subMinutes(12),
-            'est_ready_at' => now()->addMinutes(30),
-        ]);
+        $cookingBooking = Booking::factory()->create(['created_at' => now()->subMinutes(12)]);
         $cookingBooking->items()->create([
             'service_id' => $serviceA->id,
             'qty' => 100,
             'est_weight_kg' => 1,
             'rate' => 150,
             'subtotal' => 150,
+            'status' => 'cooking',
+            'cooking_started_at' => now()->subMinutes(12),
+            'est_ready_at' => now()->addMinutes(30),
         ]);
 
-        $readyBooking = Booking::factory()->create(['status' => 'ready']);
+        $readyBooking = Booking::factory()->create();
+        $readyBooking->items()->create([
+            'service_id' => Service::factory()->create()->id,
+            'qty' => 1,
+            'rate' => 150,
+            'subtotal' => 150,
+            'status' => 'ready',
+        ]);
 
         $response = $this->getJson('/api/v1/admin/dashboard');
 

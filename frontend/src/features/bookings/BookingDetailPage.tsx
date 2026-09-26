@@ -36,7 +36,10 @@ export function BookingDetailPage() {
         <ul className="flex flex-col gap-1">
           {booking.status_logs?.map((log) => (
             <li key={log.id} className="text-sm">
-              <span className="font-medium">{humanizeStatus(log.status)}</span>{' '}
+              <span className="font-medium">
+                {booking.items.length > 1 && log.service_name ? `${log.service_name}: ` : ''}
+                {humanizeStatus(log.status)}
+              </span>{' '}
               <span className="text-muted-foreground">
                 - {new Date(log.created_at).toLocaleString()}
                 {log.changed_by_name ? ` by ${log.changed_by_name}` : ''}

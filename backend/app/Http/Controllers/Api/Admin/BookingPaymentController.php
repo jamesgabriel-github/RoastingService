@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StorePaymentRequest;
 use App\Http\Resources\AdminBookingResource;
 use App\Models\Booking;
+use App\Models\BookingItem;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -24,9 +25,13 @@ class BookingPaymentController extends Controller
     public function store(StorePaymentRequest $request, int $id): AdminBookingResource
     {
         $booking = DB::transaction(function () use ($request, $id) {
-            $booking = Booking::lockForUpdate()->findOrFail($id);
+            $booking = Booking::with('items')->lockForUpdate()->findOrFail($id);
 
-            if (! in_array($booking->status, self::PAYMENT_ELIGIBLE_STATUSES, true)) {
+            $eligible = $booking->items->every(
+                fn (BookingItem $item) => in_array($item->status, self::PAYMENT_ELIGIBLE_STATUSES, true)
+            );
+
+            if (! $eligible) {
                 throw ValidationException::withMessages([
                     'status' => 'This booking cannot accept payment right now.',
                 ]);

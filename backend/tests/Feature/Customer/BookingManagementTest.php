@@ -47,7 +47,6 @@ class BookingManagementTest extends TestCase
         $this->assertDatabaseHas('bookings', [
             'code' => $code,
             'customer_id' => $customer->id,
-            'status' => 'pending_review',
             'estimated_total' => 600,
             'total_amount' => null,
         ]);
@@ -57,6 +56,7 @@ class BookingManagementTest extends TestCase
             'est_weight_kg' => 4,
             'rate' => 150,
             'subtotal' => 600,
+            'status' => 'pending_review',
         ]);
         $this->assertDatabaseCount('booking_status_logs', 1);
         $this->assertDatabaseHas('booking_status_logs', [
