@@ -17,6 +17,10 @@ export const QUEUE_TABS: { status: QueueStatus; label: string }[] = [
   { status: 'out_for_delivery', label: 'Out for delivery' },
 ]
 
+export function parseQueueStatus(raw: string | null): QueueStatus {
+  return QUEUE_TABS.some((tab) => tab.status === raw) ? (raw as QueueStatus) : 'pending_review'
+}
+
 export type BookingCounts = Record<QueueStatus, number>
 
 export interface AdminBookingItem {

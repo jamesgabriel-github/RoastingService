@@ -1,6 +1,6 @@
 # Roasting Service - Project Overview
 
-<!-- blueprint:source-hash 2e5aaae2f825fea59d10adc13d314abaebe2776e996f0b5dbbb14fda15f53b59 -->
+<!-- blueprint:source-hash 6e14365be3c599a3011c1ae816e172077b067a78d0905d07320dfe7312695338 -->
 
 > A booking and inventory system for a roasting shop: customers book roasting
 > for their own raw food or order roasted items from shop stock, and admins run
@@ -69,6 +69,7 @@ weigh-in, cooking, payments, dashboard) is built on it.
 14. **Payments** - admin records full payments (cash, GCash, card); paid vs balance shown; filterable payments list.
 15. **Sales dashboard** - sales today/week/month by booking type, bookings by status, today's cooking/ready queue, top items, low-stock alerts.
 16. **Public landing page** - hero + Book Now, about, services cards, how it works, location/contact.
+17. **Admin sidebar navigation** - persistent left sidebar (Dashboard, Booking with a status sub-menu, Services, Inventory, Payments, Admin accounts) replacing the admin topbar, reusing existing per-module permission gating; booking status sub-menu items link to bookmarkable URLs on the existing bookings queue page.
 
 ## Data model
 

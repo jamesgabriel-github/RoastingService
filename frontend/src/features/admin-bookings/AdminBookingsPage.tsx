@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/currency'
 import { useAdminBookings, useBookingCounts } from './hooks'
-import { QUEUE_TABS } from './types'
+import { parseQueueStatus, QUEUE_TABS } from './types'
 import type { QueueStatus } from './types'
 import { formatWaitingTime } from './waitingTime'
 
@@ -15,7 +15,8 @@ function todayDateString(): string {
 }
 
 export function AdminBookingsPage() {
-  const [status, setStatus] = useState<QueueStatus>('pending_review')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const status = parseQueueStatus(searchParams.get('status'))
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [date, setDate] = useState(todayDateString)
@@ -23,7 +24,10 @@ export function AdminBookingsPage() {
   const { data, isLoading } = useAdminBookings(status, search, page, date)
 
   const selectTab = (next: QueueStatus) => {
-    setStatus(next)
+    setSearchParams((params) => {
+      params.set('status', next)
+      return params
+    })
     setPage(1)
   }
 
