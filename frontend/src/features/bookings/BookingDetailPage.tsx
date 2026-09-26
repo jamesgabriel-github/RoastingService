@@ -22,13 +22,13 @@ export function BookingDetailPage() {
     return <p>Booking not found.</p>
   }
 
-  const isRoasting = booking.source_type === 'customer_supplied'
+  const isOrder = booking.is_order
 
   return (
     <div className="flex max-w-lg flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold">{booking.code}</h1>
-        <p className="text-muted-foreground">{isRoasting ? 'Bring your own' : 'Shop order'}</p>
+        <p className="text-muted-foreground">{isOrder ? 'Is order' : 'Not order'}</p>
       </div>
 
       <div className="flex flex-col gap-2 rounded-lg border p-3">
@@ -52,7 +52,7 @@ export function BookingDetailPage() {
           <div key={item.id} className="flex justify-between text-sm">
             <span>
               {item.service_name}
-              {isRoasting
+              {!isOrder
                 ? ` - est. ${item.est_weight_kg ?? '—'} kg${item.final_weight_kg ? `, final ${item.final_weight_kg} kg` : ''}`
                 : ` x ${item.qty}`}
             </span>
@@ -63,12 +63,12 @@ export function BookingDetailPage() {
 
       <div className="flex flex-col gap-1 rounded-lg border p-3">
         <p>
-          {isRoasting ? 'Estimated total' : 'Total'}:{' '}
+          {!isOrder ? 'Estimated total' : 'Total'}:{' '}
           <span className="font-semibold">
-            {formatCurrency(isRoasting ? booking.estimated_total : (booking.total_amount ?? 0))}
+            {formatCurrency(!isOrder ? booking.estimated_total : (booking.total_amount ?? 0))}
           </span>
         </p>
-        {isRoasting && booking.total_amount && (
+        {!isOrder && booking.total_amount && (
           <p>
             Final total: <span className="font-semibold">{formatCurrency(booking.total_amount)}</span>
           </p>

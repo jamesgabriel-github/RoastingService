@@ -26,7 +26,7 @@ class PaymentResource extends JsonResource
                 ? trim("{$this->booking->customer->first_name} {$this->booking->customer->last_name}")
                 : $this->booking->guest_name,
             'customer_phone' => $this->booking->customer?->phone ?? $this->booking->guest_phone,
-            'source_type' => $this->booking->source_type,
+            'is_order' => $this->booking->is_order,
             'type' => $this->type,
             'amount' => $this->amount,
             'method' => $this->method,

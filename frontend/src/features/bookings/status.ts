@@ -1,13 +1,13 @@
 import type { Booking } from './types'
 
-const CANCELLABLE_STATUSES: Record<Booking['source_type'], readonly string[]> = {
-  customer_supplied: ['pending_review', 'approved', 'confirmed'],
-  shop_supplied: ['pending_confirmation', 'confirmed'],
+const CANCELLABLE_STATUSES: Record<'false' | 'true', readonly string[]> = {
+  false: ['pending_review', 'approved', 'confirmed'],
+  true: ['pending_confirmation', 'confirmed'],
 }
 
 /** UI-only convenience mirroring BookingStatusEngine's cancellable-from set; the server is authoritative. */
-export function isCancellable(booking: Pick<Booking, 'source_type' | 'status'>): boolean {
-  return CANCELLABLE_STATUSES[booking.source_type].includes(booking.status)
+export function isCancellable(booking: Pick<Booking, 'is_order' | 'status'>): boolean {
+  return CANCELLABLE_STATUSES[booking.is_order ? 'true' : 'false'].includes(booking.status)
 }
 
 export function humanizeStatus(status: string): string {

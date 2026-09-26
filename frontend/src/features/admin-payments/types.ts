@@ -13,7 +13,7 @@ export interface Payment {
   booking_code: string
   customer_name: string | null
   customer_phone: string | null
-  source_type: 'customer_supplied' | 'shop_supplied'
+  is_order: boolean
   type: 'full' | 'downpayment' | 'balance'
   amount: string
   method: PaymentMethod

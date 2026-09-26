@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'customer_id',
     'guest_name',
     'guest_phone',
-    'source_type',
+    'is_order',
     'fulfillment',
     'delivery_address',
     'shipping_fee',
@@ -46,6 +46,7 @@ class Booking extends Model
     protected function casts(): array
     {
         return [
+            'is_order' => 'boolean',
             'shipping_fee' => 'decimal:2',
             'estimated_total' => 'decimal:2',
             'total_amount' => 'decimal:2',

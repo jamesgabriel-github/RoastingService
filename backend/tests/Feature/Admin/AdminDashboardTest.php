@@ -75,7 +75,7 @@ class AdminDashboardTest extends TestCase
             'is_active' => false,
         ]);
 
-        $todayBooking = Booking::factory()->create(['source_type' => 'customer_supplied', 'status' => 'completed']);
+        $todayBooking = Booking::factory()->create(['is_order' => false, 'status' => 'completed']);
         $todayBooking->items()->create([
             'service_id' => $serviceA->id,
             'qty' => 5,
@@ -90,7 +90,7 @@ class AdminDashboardTest extends TestCase
             'paid_at' => now()->subHours(2),
         ]);
 
-        $weekBooking = Booking::factory()->create(['source_type' => 'shop_supplied', 'status' => 'completed']);
+        $weekBooking = Booking::factory()->create(['is_order' => true, 'status' => 'completed']);
         Payment::factory()->create([
             'booking_id' => $weekBooking->id,
             'amount' => 50,
@@ -98,7 +98,7 @@ class AdminDashboardTest extends TestCase
             'paid_at' => $weekStart->copy()->addHours(3),
         ]);
 
-        $monthBooking = Booking::factory()->create(['source_type' => 'customer_supplied', 'status' => 'completed']);
+        $monthBooking = Booking::factory()->create(['is_order' => false, 'status' => 'completed']);
         $monthBooking->items()->create([
             'service_id' => $serviceB->id,
             'qty' => 3,
@@ -113,7 +113,7 @@ class AdminDashboardTest extends TestCase
             'paid_at' => $monthStart->copy()->addHours(3),
         ]);
 
-        $olderBooking = Booking::factory()->create(['source_type' => 'shop_supplied', 'status' => 'completed']);
+        $olderBooking = Booking::factory()->create(['is_order' => true, 'status' => 'completed']);
         Payment::factory()->create([
             'booking_id' => $olderBooking->id,
             'amount' => 999,
@@ -144,9 +144,9 @@ class AdminDashboardTest extends TestCase
         $response->assertOk();
         $response->assertJson([
             'sales' => [
-                'today' => ['customer_supplied' => '100.00', 'shop_supplied' => '0.00', 'total' => '100.00'],
-                'week' => ['customer_supplied' => '100.00', 'shop_supplied' => '50.00', 'total' => '150.00'],
-                'month' => ['customer_supplied' => '125.00', 'shop_supplied' => '50.00', 'total' => '175.00'],
+                'today' => ['not_order' => '100.00', 'is_order' => '0.00', 'total' => '100.00'],
+                'week' => ['not_order' => '100.00', 'is_order' => '50.00', 'total' => '150.00'],
+                'month' => ['not_order' => '125.00', 'is_order' => '50.00', 'total' => '175.00'],
             ],
             'bookings_by_status' => [
                 'pending_review' => 2,

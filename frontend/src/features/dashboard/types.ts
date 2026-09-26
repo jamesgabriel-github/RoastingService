@@ -1,6 +1,6 @@
 export interface SalesPeriod {
-  customer_supplied: string
-  shop_supplied: string
+  not_order: string
+  is_order: string
   total: string
 }
 
@@ -21,7 +21,7 @@ export interface BookingsByStatus {
 export interface ActiveQueueEntry {
   id: number
   code: string
-  source_type: 'customer_supplied' | 'shop_supplied'
+  is_order: boolean
   status: 'cooking' | 'ready'
   customer_name: string | null
   fulfillment: 'pickup' | 'delivery'

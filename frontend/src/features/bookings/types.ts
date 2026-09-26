@@ -32,7 +32,7 @@ export interface BookingStatusLog {
 export interface Booking {
   id: number
   code: string
-  source_type: 'customer_supplied' | 'shop_supplied'
+  is_order: boolean
   status: string
   fulfillment: Fulfillment
   delivery_address: string | null

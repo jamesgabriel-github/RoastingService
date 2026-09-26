@@ -36,7 +36,7 @@ class BookingManagementTest extends TestCase
         $response->assertCreated();
         $response->assertJson([
             'status' => 'pending_review',
-            'source_type' => 'customer_supplied',
+            'is_order' => false,
             'fulfillment' => 'pickup',
             'estimated_total' => '600.00',
         ]);

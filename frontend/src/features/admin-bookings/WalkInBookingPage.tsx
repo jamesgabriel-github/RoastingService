@@ -214,24 +214,16 @@ export function WalkInBookingPage() {
 
       <div className="flex flex-col gap-2">
         <h2 className="font-semibold">Booking type</h2>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={bookingType === 'roasting' ? 'default' : 'outline'}
-            onClick={() => selectBookingType('roasting')}
-          >
-            Bring your own
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={bookingType === 'shop' ? 'default' : 'outline'}
-            onClick={() => selectBookingType('shop')}
-          >
-            Shop items
-          </Button>
-        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={bookingType === 'shop'}
+            onChange={(event) => selectBookingType(event.target.checked ? 'shop' : 'roasting')}
+          />
+          Is order (customer is buying a shop item)
+        </label>
+        <p className="text-sm text-muted-foreground">Leave unchecked for a bring-your-own booking.</p>
       </div>
 
       <div className="flex flex-col gap-2">

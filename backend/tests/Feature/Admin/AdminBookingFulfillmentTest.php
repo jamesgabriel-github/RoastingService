@@ -52,7 +52,7 @@ class AdminBookingFulfillmentTest extends TestCase
     private function shopOrder(array $attributes = []): Booking
     {
         return Booking::factory()->create(array_merge([
-            'source_type' => 'shop_supplied',
+            'is_order' => true,
             'status' => 'pending_confirmation',
         ], $attributes));
     }

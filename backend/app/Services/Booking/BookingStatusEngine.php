@@ -9,17 +9,16 @@ use InvalidArgumentException;
 /**
  * The single place that knows which booking-status moves are allowed and
  * writes the audit trail for each one. `null` as a from-status means
- * "booking creation". Both source types share one status column, so a
- * customer-supplied booking never reaches a shop-supplied-only status and
- * vice versa.
+ * "booking creation". Both order flags share one status column, so a
+ * non-order booking never reaches an order-only status and vice versa.
  */
 class BookingStatusEngine
 {
     /**
-     * @var array<string, array<string|null, list<string>>>
+     * @var array<int, array<string|null, list<string>>>
      */
     private const TRANSITIONS = [
-        'customer_supplied' => [
+        0 => [
             null => ['pending_review'],
             'pending_review' => ['approved', 'rejected', 'cancelled'],
             'approved' => ['confirmed', 'cancelled', 'no_show'],
@@ -28,7 +27,7 @@ class BookingStatusEngine
             'ready' => ['completed'],
             'out_for_delivery' => ['completed'],
         ],
-        'shop_supplied' => [
+        1 => [
             null => ['pending_confirmation'],
             'pending_confirmation' => ['confirmed', 'rejected', 'cancelled'],
             'confirmed' => ['cooking', 'cancelled'],
@@ -38,20 +37,14 @@ class BookingStatusEngine
         ],
     ];
 
-    public function initialStatusFor(string $sourceType): string
+    public function initialStatusFor(bool $isOrder): string
     {
-        $initial = self::TRANSITIONS[$sourceType][null] ?? null;
-
-        if ($initial === null) {
-            throw new InvalidArgumentException("Unknown booking source type: {$sourceType}");
-        }
-
-        return $initial[0];
+        return self::TRANSITIONS[$isOrder][null][0];
     }
 
-    public function isAllowed(string $sourceType, ?string $from, string $to): bool
+    public function isAllowed(bool $isOrder, ?string $from, string $to): bool
     {
-        return in_array($to, self::TRANSITIONS[$sourceType][$from] ?? [], true);
+        return in_array($to, self::TRANSITIONS[$isOrder][$from] ?? [], true);
     }
 
     /**
@@ -60,11 +53,12 @@ class BookingStatusEngine
      */
     public function transition(Booking $booking, string $to, ?int $changedBy = null, ?string $remarks = null): void
     {
-        if (! $this->isAllowed($booking->source_type, $booking->status, $to)) {
+        if (! $this->isAllowed($booking->is_order, $booking->status, $to)) {
             $from = $booking->status ?? 'creation';
+            $label = $booking->is_order ? 'order' : 'non-order';
 
             throw new InvalidArgumentException(
-                "Cannot move a {$booking->source_type} booking from {$from} to {$to}."
+                "Cannot move a {$label} booking from {$from} to {$to}."
             );
         }
 

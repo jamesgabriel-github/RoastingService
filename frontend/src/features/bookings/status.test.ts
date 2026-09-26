@@ -12,19 +12,19 @@ describe('humanizeStatus', () => {
 })
 
 describe('isCancellable', () => {
-  it('is true for a pending_review customer_supplied booking', () => {
-    expect(isCancellable({ source_type: 'customer_supplied', status: 'pending_review' })).toBe(true)
+  it('is true for a pending_review non-order booking', () => {
+    expect(isCancellable({ is_order: false, status: 'pending_review' })).toBe(true)
   })
 
-  it('is false once a customer_supplied booking is cooking', () => {
-    expect(isCancellable({ source_type: 'customer_supplied', status: 'cooking' })).toBe(false)
+  it('is false once a non-order booking is cooking', () => {
+    expect(isCancellable({ is_order: false, status: 'cooking' })).toBe(false)
   })
 
-  it('is true for a pending_confirmation shop_supplied booking', () => {
-    expect(isCancellable({ source_type: 'shop_supplied', status: 'pending_confirmation' })).toBe(true)
+  it('is true for a pending_confirmation order booking', () => {
+    expect(isCancellable({ is_order: true, status: 'pending_confirmation' })).toBe(true)
   })
 
   it('is false for a completed booking', () => {
-    expect(isCancellable({ source_type: 'shop_supplied', status: 'completed' })).toBe(false)
+    expect(isCancellable({ is_order: true, status: 'completed' })).toBe(false)
   })
 })

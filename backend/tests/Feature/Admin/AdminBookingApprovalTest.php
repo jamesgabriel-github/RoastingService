@@ -87,7 +87,7 @@ class AdminBookingApprovalTest extends TestCase
     {
         $this->loginAsSuperAdmin();
         $booking = Booking::factory()->create([
-            'source_type' => 'shop_supplied',
+            'is_order' => true,
             'status' => 'pending_confirmation',
         ]);
 
@@ -164,7 +164,7 @@ class AdminBookingApprovalTest extends TestCase
     {
         $this->loginAsSuperAdmin();
         $booking = Booking::factory()->create([
-            'source_type' => 'shop_supplied',
+            'is_order' => true,
             'status' => 'pending_confirmation',
         ]);
 

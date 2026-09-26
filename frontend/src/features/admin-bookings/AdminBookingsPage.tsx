@@ -76,11 +76,9 @@ export function AdminBookingsPage() {
                     <div>{booking.customer_name ?? '—'}</div>
                     <div className="text-sm text-muted-foreground">{booking.customer_phone ?? '—'}</div>
                   </td>
-                  <td className="p-2">{booking.source_type === 'customer_supplied' ? 'Bring your own' : 'Shop'}</td>
+                  <td className="p-2">{booking.is_order ? 'Is order' : 'Not order'}</td>
                   <td className="p-2">
-                    {formatCurrency(
-                      booking.source_type === 'customer_supplied' ? booking.estimated_total : (booking.total_amount ?? 0)
-                    )}
+                    {formatCurrency(booking.is_order ? (booking.total_amount ?? 0) : booking.estimated_total)}
                   </td>
                   <td className="p-2">{formatWaitingTime(booking.waiting_minutes)}</td>
                   <td className="p-2">

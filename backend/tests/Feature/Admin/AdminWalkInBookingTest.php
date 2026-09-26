@@ -62,7 +62,7 @@ class AdminWalkInBookingTest extends TestCase
 
         $response->assertCreated();
         $response->assertJsonPath('status', 'confirmed');
-        $response->assertJsonPath('source_type', 'customer_supplied');
+        $response->assertJsonPath('is_order', false);
         $response->assertJsonPath('total_amount', '375.00');
         $this->assertNotNull($response->json('approved_at'));
         $this->assertNotNull($response->json('weighed_at'));
@@ -120,7 +120,7 @@ class AdminWalkInBookingTest extends TestCase
 
         $response->assertCreated();
         $response->assertJsonPath('status', 'confirmed');
-        $response->assertJsonPath('source_type', 'shop_supplied');
+        $response->assertJsonPath('is_order', true);
         $response->assertJsonPath('total_amount', '250.00');
 
         $booking = Booking::first();

@@ -9,12 +9,12 @@ function SalesCard({ title, period }: { title: string; period: SalesPeriod }) {
     <div className="flex flex-col gap-2 rounded-lg border p-4">
       <h3 className="font-semibold">{title}</h3>
       <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground">Bring your own</span>
-        <span>{formatCurrency(period.customer_supplied)}</span>
+        <span className="text-muted-foreground">Not order</span>
+        <span>{formatCurrency(period.not_order)}</span>
       </div>
       <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground">Shop</span>
-        <span>{formatCurrency(period.shop_supplied)}</span>
+        <span className="text-muted-foreground">Is order</span>
+        <span>{formatCurrency(period.is_order)}</span>
       </div>
       <div className="flex justify-between border-t pt-2 font-semibold">
         <span>Total</span>

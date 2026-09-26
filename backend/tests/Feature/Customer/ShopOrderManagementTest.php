@@ -34,7 +34,7 @@ class ShopOrderManagementTest extends TestCase
         $response->assertCreated();
         $response->assertJson([
             'status' => 'pending_confirmation',
-            'source_type' => 'shop_supplied',
+            'is_order' => true,
             'fulfillment' => 'pickup',
             'total_amount' => '750.00',
             'estimated_total' => '0.00',

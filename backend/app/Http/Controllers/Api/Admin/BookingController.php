@@ -329,7 +329,7 @@ class BookingController extends Controller
 
             $this->guardAnyTransition($booking, $statusEngine, 'cancelled', 'cancelled');
 
-            if ($booking->source_type === 'shop_supplied') {
+            if ($booking->is_order) {
                 foreach ($booking->items->sortBy('service_id') as $item) {
                     Service::where('id', $item->service_id)->increment('stock_qty', $item->qty);
 
@@ -352,17 +352,18 @@ class BookingController extends Controller
     }
 
     /**
-     * Approve, reject, and weigh-in are only for bring-your-own bookings - a
-     * shop-supplied order reaches `rejected`/`confirmed` through feature 11's
-     * own flow instead, which also releases its reserved stock on rejection.
-     * `BookingStatusEngine::isAllowed` alone does not scope to source type,
-     * since `shop_supplied` can reach both statuses too, so this checks both.
+     * Approve, reject, and weigh-in are only for bring-your-own (non-order)
+     * bookings - a shop order reaches `rejected`/`confirmed` through feature
+     * 11's own flow instead, which also releases its reserved stock on
+     * rejection. `BookingStatusEngine::isAllowed` alone does not scope to the
+     * order flag, since an order can reach both statuses too, so this checks
+     * both.
      */
     private function guardTransition(Booking $booking, BookingStatusEngine $statusEngine, string $to, string $action): void
     {
         if (
-            $booking->source_type !== 'customer_supplied'
-            || ! $statusEngine->isAllowed($booking->source_type, $booking->status, $to)
+            $booking->is_order
+            || ! $statusEngine->isAllowed($booking->is_order, $booking->status, $to)
         ) {
             throw ValidationException::withMessages([
                 'status' => "This booking cannot be {$action} right now.",
@@ -371,14 +372,14 @@ class BookingController extends Controller
     }
 
     /**
-     * Confirm and reject-order are only for shop-supplied bookings - the
-     * bring-your-own counterpart is `guardTransition` above.
+     * Confirm and reject-order are only for shop orders - the bring-your-own
+     * counterpart is `guardTransition` above.
      */
     private function guardOrderTransition(Booking $booking, BookingStatusEngine $statusEngine, string $to, string $action): void
     {
         if (
-            $booking->source_type !== 'shop_supplied'
-            || ! $statusEngine->isAllowed($booking->source_type, $booking->status, $to)
+            ! $booking->is_order
+            || ! $statusEngine->isAllowed($booking->is_order, $booking->status, $to)
         ) {
             throw ValidationException::withMessages([
                 'status' => "This booking cannot be {$action} right now.",
@@ -387,14 +388,14 @@ class BookingController extends Controller
     }
 
     /**
-     * For actions valid across both source types (start-cooking, ready,
+     * For actions valid across both order flags (start-cooking, ready,
      * out-for-delivery, complete, cancel) - only checks `isAllowed`, unlike
      * `guardTransition`/`guardOrderTransition` which stay scoped to one
-     * source type.
+     * order flag.
      */
     private function guardAnyTransition(Booking $booking, BookingStatusEngine $statusEngine, string $to, string $action): void
     {
-        if (! $statusEngine->isAllowed($booking->source_type, $booking->status, $to)) {
+        if (! $statusEngine->isAllowed($booking->is_order, $booking->status, $to)) {
             throw ValidationException::withMessages([
                 'status' => "This booking cannot be {$action} right now.",
             ]);

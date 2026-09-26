@@ -24,14 +24,14 @@ export function MyBookingsPage() {
                 <div>
                   <p className="font-mono font-semibold">{booking.code}</p>
                   <p className="text-sm text-muted-foreground">
-                    {booking.source_type === 'customer_supplied' ? 'Bring your own' : 'Shop order'}
+                    {booking.is_order ? 'Is order' : 'Not order'}
                   </p>
                 </div>
                 <div className="text-right">
                   <p>{humanizeStatus(booking.status)}</p>
                   <p className="text-sm text-muted-foreground">
                     {formatCurrency(
-                      booking.source_type === 'customer_supplied' ? booking.estimated_total : (booking.total_amount ?? 0)
+                      booking.is_order ? (booking.total_amount ?? 0) : booking.estimated_total
                     )}
                   </p>
                 </div>

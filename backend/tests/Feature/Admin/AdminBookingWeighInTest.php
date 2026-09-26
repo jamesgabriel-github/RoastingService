@@ -134,7 +134,7 @@ class AdminBookingWeighInTest extends TestCase
     {
         $this->loginAsSuperAdmin();
         $booking = Booking::factory()->create([
-            'source_type' => 'shop_supplied',
+            'is_order' => true,
             'status' => 'pending_confirmation',
         ]);
         $service = Service::factory()->create();

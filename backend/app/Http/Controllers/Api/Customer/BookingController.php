@@ -44,13 +44,13 @@ class BookingController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($id);
 
-            if (! $statusEngine->isAllowed($booking->source_type, $booking->status, 'cancelled')) {
+            if (! $statusEngine->isAllowed($booking->is_order, $booking->status, 'cancelled')) {
                 throw ValidationException::withMessages([
                     'status' => 'This booking can no longer be cancelled.',
                 ]);
             }
 
-            if ($booking->source_type === 'shop_supplied') {
+            if ($booking->is_order) {
                 // Mutate rows in a fixed ascending id order, matching OrderController's
                 // reservation lock order, so a cancel and a concurrent order can't deadlock.
                 foreach ($booking->items->sortBy('service_id') as $item) {
@@ -106,7 +106,7 @@ class BookingController extends Controller
             $booking = Booking::create([
                 'code' => $codeGenerator->next(),
                 'customer_id' => $request->user()->id,
-                'source_type' => 'customer_supplied',
+                'is_order' => false,
                 'fulfillment' => $request->validated('fulfillment'),
                 'delivery_address' => $request->validated('delivery_address'),
                 'shipping_fee' => 0,
@@ -119,7 +119,7 @@ class BookingController extends Controller
                 $booking->items()->create($itemData);
             }
 
-            $statusEngine->transition($booking, $statusEngine->initialStatusFor('customer_supplied'));
+            $statusEngine->transition($booking, $statusEngine->initialStatusFor(false));
 
             return $booking;
         });

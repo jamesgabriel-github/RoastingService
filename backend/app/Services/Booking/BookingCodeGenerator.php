@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Generates the next `RS-####` booking code. One shared sequence across both
  * booking types, since `bookings.code` is one unique column regardless of
- * `source_type`. Must run inside the caller's transaction: the advisory lock
+ * `is_order`. Must run inside the caller's transaction: the advisory lock
  * is transaction-scoped and releases automatically at commit/rollback.
  *
  * A plain `lockForUpdate()` on the last row would not actually serialize two

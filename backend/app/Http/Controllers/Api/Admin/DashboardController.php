@@ -52,17 +52,17 @@ class DashboardController extends Controller
             ->join('payments', 'payments.booking_id', '=', 'bookings.id')
             ->where('payments.status', 'paid')
             ->where('payments.paid_at', '>=', $from)
-            ->selectRaw('bookings.source_type, sum(payments.amount) as aggregate')
-            ->groupBy('bookings.source_type')
-            ->pluck('aggregate', 'source_type');
+            ->selectRaw('bookings.is_order::int as is_order, sum(payments.amount) as aggregate')
+            ->groupBy('bookings.is_order')
+            ->pluck('aggregate', 'is_order');
 
-        $customerSupplied = (float) ($totals['customer_supplied'] ?? 0);
-        $shopSupplied = (float) ($totals['shop_supplied'] ?? 0);
+        $notOrder = (float) ($totals[0] ?? 0);
+        $isOrder = (float) ($totals[1] ?? 0);
 
         return [
-            'customer_supplied' => number_format($customerSupplied, 2, '.', ''),
-            'shop_supplied' => number_format($shopSupplied, 2, '.', ''),
-            'total' => number_format($customerSupplied + $shopSupplied, 2, '.', ''),
+            'not_order' => number_format($notOrder, 2, '.', ''),
+            'is_order' => number_format($isOrder, 2, '.', ''),
+            'total' => number_format($notOrder + $isOrder, 2, '.', ''),
         ];
     }
 
@@ -91,7 +91,7 @@ class DashboardController extends Controller
             ->map(fn (Booking $booking) => [
                 'id' => $booking->id,
                 'code' => $booking->code,
-                'source_type' => $booking->source_type,
+                'is_order' => $booking->is_order,
                 'status' => $booking->status,
                 'customer_name' => $booking->customer
                     ? trim("{$booking->customer->first_name} {$booking->customer->last_name}")

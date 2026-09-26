@@ -71,7 +71,7 @@ class OrderController extends Controller
             $booking = Booking::create([
                 'code' => $codeGenerator->next(),
                 'customer_id' => $customerId,
-                'source_type' => 'shop_supplied',
+                'is_order' => true,
                 'fulfillment' => $request->validated('fulfillment'),
                 'delivery_address' => $request->validated('delivery_address'),
                 'shipping_fee' => 0,
@@ -97,7 +97,7 @@ class OrderController extends Controller
                 ]);
             }
 
-            $statusEngine->transition($booking, $statusEngine->initialStatusFor('shop_supplied'));
+            $statusEngine->transition($booking, $statusEngine->initialStatusFor(true));
 
             return $booking;
         });

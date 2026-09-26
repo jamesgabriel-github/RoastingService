@@ -47,7 +47,7 @@ class AdminOrderConfirmationTest extends TestCase
     private function shopOrder(array $attributes = []): Booking
     {
         return Booking::factory()->create(array_merge([
-            'source_type' => 'shop_supplied',
+            'is_order' => true,
             'status' => 'pending_confirmation',
         ], $attributes));
     }
@@ -89,7 +89,7 @@ class AdminOrderConfirmationTest extends TestCase
     {
         $this->loginAsSuperAdmin();
         $booking = Booking::factory()->create([
-            'source_type' => 'customer_supplied',
+            'is_order' => false,
             'status' => 'approved',
         ]);
 
@@ -179,7 +179,7 @@ class AdminOrderConfirmationTest extends TestCase
     {
         $this->loginAsSuperAdmin();
         $booking = Booking::factory()->create([
-            'source_type' => 'customer_supplied',
+            'is_order' => false,
             'status' => 'pending_review',
         ]);
         $service = Service::factory()->create(['stock_qty' => 5]);

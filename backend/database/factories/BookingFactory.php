@@ -21,7 +21,7 @@ class BookingFactory extends Factory
         return [
             'code' => 'RS-'.str_pad((string) fake()->unique()->numberBetween(1, 9999), 4, '0', STR_PAD_LEFT),
             'customer_id' => User::factory(),
-            'source_type' => 'customer_supplied',
+            'is_order' => false,
             'fulfillment' => 'pickup',
             'shipping_fee' => 0,
             'status' => 'pending_review',

@@ -47,7 +47,7 @@ class AdminBookingPaymentTest extends TestCase
     {
         $admin = $this->loginAsSuperAdmin();
         $booking = Booking::factory()->create([
-            'source_type' => 'customer_supplied',
+            'is_order' => false,
             'status' => 'confirmed',
             'total_amount' => 705,
         ]);
@@ -76,7 +76,7 @@ class AdminBookingPaymentTest extends TestCase
     {
         $this->loginAsSuperAdmin();
         $booking = Booking::factory()->create([
-            'source_type' => 'shop_supplied',
+            'is_order' => true,
             'status' => 'confirmed',
             'total_amount' => 300,
         ]);
