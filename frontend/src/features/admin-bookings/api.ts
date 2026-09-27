@@ -6,7 +6,13 @@ import type {
   QueueGroup,
   WalkInCustomer,
   WalkInGuestOrCustomer,
+  WalkInService,
 } from './types'
+
+export async function fetchWalkInServices(): Promise<WalkInService[]> {
+  const { data } = await api.get<WalkInService[]>('/services')
+  return data
+}
 
 export interface ApprovePayload {
   dropoff_at: string
@@ -128,8 +134,14 @@ export async function searchWalkInCustomers(search: string): Promise<WalkInCusto
   return data
 }
 
-export interface WalkInRoastingPayload extends WalkInGuestOrCustomer {
-  items: { service_id: number; final_weight_kg: number }[]
+export interface WalkInPaymentTendered {
+  paid_amount: number | null
+  payment_method: 'cash' | 'gcash' | null
+  payment_reference_no: string | null
+}
+
+export interface WalkInRoastingPayload extends WalkInGuestOrCustomer, WalkInPaymentTendered {
+  items: { service_id: number; final_weight_kg: number; est_minutes: number | null }[]
   fulfillment: AdminBooking['fulfillment']
   delivery_address: string | null
   preferred_pickup_at: string
@@ -142,8 +154,8 @@ export async function createWalkInRoastingBooking(payload: WalkInRoastingPayload
   return data
 }
 
-export interface WalkInShopPayload extends WalkInGuestOrCustomer {
-  items: { service_id: number; qty: number }[]
+export interface WalkInShopPayload extends WalkInGuestOrCustomer, WalkInPaymentTendered {
+  items: { service_id: number; qty: number; est_minutes: number | null }[]
   fulfillment: AdminBooking['fulfillment']
   delivery_address: string | null
   preferred_pickup_at: string

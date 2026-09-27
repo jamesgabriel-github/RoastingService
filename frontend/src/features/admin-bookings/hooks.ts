@@ -22,6 +22,7 @@ import {
   markReady,
   noShowBooking,
   recordPayment,
+  fetchWalkInServices,
   rejectBooking,
   rejectOrder,
   searchWalkInCustomers,
@@ -48,6 +49,13 @@ export function useAdminBookingDetail(id: number) {
   return useQuery({
     queryKey: ['admin-bookings', 'detail', id],
     queryFn: () => fetchAdminBookingDetail(id),
+  })
+}
+
+export function useWalkInServices() {
+  return useQuery({
+    queryKey: ['walk-in-services'],
+    queryFn: fetchWalkInServices,
   })
 }
 

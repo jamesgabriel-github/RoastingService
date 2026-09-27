@@ -237,7 +237,7 @@
 **Found:** 2026-09-25 by /audit independent (scope: current; lens: quality)
 **Why it matters:** `useBookableServices()`, `useShoppableServices()`, and `useSearchWalkInCustomers()` read only `data` (and `isFetching`). If `GET /services` fails, the item dropdown shows only "Select an item" with no message. If the customer search fails (a 403, 5xx, or network error), or returns an empty array, the result list at line 278 renders nothing. The admin cannot tell "no customer with that name or phone" from "the search broke", so they may wrongly record a registered customer as a guest. The coding standards say to surface errors rather than fail silently. This repeats the F-34/F-36/F-44 pattern on the new page.
 **Suggested fix:** Destructure `isError`/`error` from the three queries and render `getGenericErrorMessage(error)` inline. Show a short "No customers found" line when the search has finished with an empty result. Current requirement lost: None.
-**Resolution:**
+**Resolution:** Re-examined 2026-09-28 by /audit independent (fix/walk-in-counter-redesign review of `829b0b5`; scope: current; all lenses). This fix replaced `useBookableServices()`/`useShoppableServices()` with a single new `useWalkInServices()` hook (`hooks.ts:55-60`, backed by `fetchWalkInServices()` hitting the public `/services` endpoint); it still reads only `data` with no `isError`/`error` handling, so the services-catalogue half of this finding now applies to the new hook instead of the old two. `useSearchWalkInCustomers()` is untouched. Still open.
 
 ### F-58 [P3] open - Walk-in guest phone is stored as typed, not normalized like every customer phone
 
@@ -326,3 +326,12 @@
 **Why it matters:** `counts()` counts every `booking_items` row in each group with no date filter, while `index()` only lists items whose booking's `preferred_pickup_at` falls on the selected date (default today). The base already had this mismatch for the active statuses, but this delta adds two terminal groups, `completed` and `cancelled`, whose counts only grow. After a few weeks the tab reads, for example, "Completed (1,240)" while the list shows today's three rows, and staff cannot use the badge to gauge the day's work. The spec asks for "one count per group" but does not say whether counts follow the date filter.
 **Suggested fix:** Decide the intended scope with the user. Either pass the same `date` to `counts()` and apply the same `whereHas('booking', ... whereDate('preferred_pickup_at', $date))`, or drop the badge for the two terminal tabs. Current requirement lost: None if counts follow the list's date; an all-time total is lost only if someone relies on it.
 **Resolution:**
+
+### F-74 [P2] open - Walk-in payment tendering adds a third instance of float arithmetic on decimal money columns
+
+**File:** backend/app/Http/Controllers/Api/Admin/WalkInController.php:58,141,228,234
+**Found:** 2026-09-28 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `recordTenderedPayment(..., float $totalAmount, ...)` and its caller compute `$totalAmount` as a native `float` accumulator (`$totalAmount += $subtotal`, itself summed from `(float) $service->roasting_rate_per_kg` / `shop_price`), then compares `$paidAmount > $totalAmount` and stores `Payment::amount` from that float. `coding-standards.md`'s Database section requires decimal/numeric columns and forbids float for money, and this is already an open, tracked pattern at F-60 (`AdminBookingResource`) and F-62 (`DashboardController`). This diff adds a third instance of the same anti-pattern in the one new piece of code this feature adds that writes money to the database (as opposed to F-60/F-62, which only read/aggregate it). For a single walk-in order (at most 20 items, realistic rates), the values stay far inside float64's exact range and `round(..., 2)` removes any binary epsilon, so no incorrect amount is reachable today.
+**Suggested fix:** Do the running total and the over-total comparison with `bcadd`/`bccomp` on the validated decimal strings instead of casting to `float`, consistent with F-60's suggested fix. Current requirement lost: None.
+**Resolution:**
+

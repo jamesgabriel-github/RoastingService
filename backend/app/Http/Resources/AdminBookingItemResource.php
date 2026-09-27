@@ -27,6 +27,7 @@ class AdminBookingItemResource extends JsonResource
             'final_weight_kg' => $this->final_weight_kg,
             'rate' => $this->rate,
             'subtotal' => $this->subtotal,
+            'est_minutes' => $this->est_minutes,
             'status' => $this->status,
             'approved_at' => $this->approved_at,
             'approved_by_name' => $this->whenLoaded('approver', fn () => $this->approver?->name),

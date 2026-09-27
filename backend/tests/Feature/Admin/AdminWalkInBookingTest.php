@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Booking;
+use App\Models\Payment;
 use App\Models\Service;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -178,6 +179,190 @@ class AdminWalkInBookingTest extends TestCase
         $this->assertSame('09179998888', $booking->guest_phone);
     }
 
+    public function test_item_est_minutes_defaults_to_the_services_own_estimate(): void
+    {
+        $this->loginAsSuperAdmin();
+        $service = Service::factory()->create(['roasting_rate_per_kg' => 100, 'est_minutes' => 90]);
+
+        $response = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+            'guest_name' => 'Jane Dela Cruz',
+            'guest_phone' => '09171234567',
+            'items' => [['service_id' => $service->id, 'final_weight_kg' => 1]],
+            'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('items.0.est_minutes', 90);
+    }
+
+    public function test_item_est_minutes_can_be_overridden_per_item(): void
+    {
+        $this->loginAsSuperAdmin();
+        $service = Service::factory()->create(['roasting_rate_per_kg' => 100, 'est_minutes' => 90]);
+
+        $response = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+            'guest_name' => 'Jane Dela Cruz',
+            'guest_phone' => '09171234567',
+            'items' => [['service_id' => $service->id, 'final_weight_kg' => 1, 'est_minutes' => 150]],
+            'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('items.0.est_minutes', 150);
+    }
+
+    public function test_walk_in_booking_code_follows_the_wb_format_and_increments_per_date(): void
+    {
+        $this->loginAsSuperAdmin();
+        $service = Service::factory()->create(['roasting_rate_per_kg' => 150]);
+        $pickupAt = now()->addDay()->setTime(11, 0);
+
+        $first = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+            'guest_name' => 'Jane Dela Cruz',
+            'guest_phone' => '09171234567',
+            'items' => [['service_id' => $service->id, 'final_weight_kg' => 1]],
+            'fulfillment' => 'pickup',
+            'preferred_pickup_at' => $pickupAt->toIso8601String(),
+        ]);
+        $second = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+            'guest_name' => 'Mark Santos',
+            'guest_phone' => '09179998888',
+            'items' => [['service_id' => $service->id, 'final_weight_kg' => 1]],
+            'fulfillment' => 'pickup',
+            'preferred_pickup_at' => $pickupAt->toIso8601String(),
+        ]);
+        $otherDate = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+            'guest_name' => 'Ana Reyes',
+            'guest_phone' => '09171112222',
+            'items' => [['service_id' => $service->id, 'final_weight_kg' => 1]],
+            'fulfillment' => 'pickup',
+            'preferred_pickup_at' => $pickupAt->clone()->addDay()->toIso8601String(),
+        ]);
+
+        $expectedDate = $pickupAt->format('ymd');
+        $first->assertJsonPath('code', "WB-{$expectedDate}-001");
+        $second->assertJsonPath('code', "WB-{$expectedDate}-002");
+        $otherDate->assertJsonPath('code', 'WB-'.$pickupAt->clone()->addDay()->format('ymd').'-001');
+    }
+
+    public function test_paid_amount_below_total_creates_a_downpayment_payment(): void
+    {
+        $admin = $this->loginAsSuperAdmin();
+        $service = Service::factory()->create(['roasting_rate_per_kg' => 100]);
+
+        $response = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+            'guest_name' => 'Jane Dela Cruz',
+            'guest_phone' => '09171234567',
+            'items' => [['service_id' => $service->id, 'final_weight_kg' => 2]],
+            'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
+            'paid_amount' => 50,
+            'payment_method' => 'cash',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('paid_amount', '50.00');
+        $response->assertJsonPath('balance', '150.00');
+
+        $booking = Booking::first();
+        $this->assertDatabaseHas('payments', [
+            'booking_id' => $booking->id,
+            'type' => 'downpayment',
+            'amount' => '50.00',
+            'method' => 'cash',
+            'status' => 'paid',
+            'recorded_by' => $admin->id,
+        ]);
+    }
+
+    public function test_paid_amount_equal_to_total_creates_a_full_payment(): void
+    {
+        $this->loginAsSuperAdmin();
+        $service = Service::factory()->create(['roasting_rate_per_kg' => 100]);
+
+        $response = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+            'guest_name' => 'Jane Dela Cruz',
+            'guest_phone' => '09171234567',
+            'items' => [['service_id' => $service->id, 'final_weight_kg' => 2]],
+            'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
+            'paid_amount' => 200,
+            'payment_method' => 'gcash',
+            'payment_reference_no' => '1002 9384 1928',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('paid_amount', '200.00');
+        $response->assertJsonPath('balance', '0.00');
+
+        $booking = Booking::first();
+        $this->assertDatabaseHas('payments', [
+            'booking_id' => $booking->id,
+            'type' => 'full',
+            'amount' => '200.00',
+            'method' => 'gcash',
+            'reference_no' => '1002 9384 1928',
+        ]);
+    }
+
+    public function test_zero_or_omitted_paid_amount_creates_no_payment(): void
+    {
+        $this->loginAsSuperAdmin();
+        $service = Service::factory()->create(['roasting_rate_per_kg' => 100]);
+
+        $response = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+            'guest_name' => 'Jane Dela Cruz',
+            'guest_phone' => '09171234567',
+            'items' => [['service_id' => $service->id, 'final_weight_kg' => 2]],
+            'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('paid_amount', '0.00');
+        $this->assertSame(0, Payment::count());
+    }
+
+    public function test_paid_amount_over_total_is_rejected(): void
+    {
+        $this->loginAsSuperAdmin();
+        $service = Service::factory()->create(['roasting_rate_per_kg' => 100]);
+
+        $response = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+            'guest_name' => 'Jane Dela Cruz',
+            'guest_phone' => '09171234567',
+            'items' => [['service_id' => $service->id, 'final_weight_kg' => 1]],
+            'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
+            'paid_amount' => 999,
+            'payment_method' => 'cash',
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['paid_amount']);
+        $this->assertSame(0, Booking::count());
+    }
+
+    public function test_payment_method_is_required_once_paid_amount_is_positive(): void
+    {
+        $this->loginAsSuperAdmin();
+        $service = Service::factory()->create(['roasting_rate_per_kg' => 100]);
+
+        $response = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+            'guest_name' => 'Jane Dela Cruz',
+            'guest_phone' => '09171234567',
+            'items' => [['service_id' => $service->id, 'final_weight_kg' => 1]],
+            'fulfillment' => 'pickup',
+            'preferred_pickup_at' => now()->toIso8601String(),
+            'paid_amount' => 50,
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['payment_method']);
+    }
+
     public function test_shop_walk_in_with_insufficient_stock_rolls_back(): void
     {
         $this->loginAsSuperAdmin();
@@ -198,15 +383,23 @@ class AdminWalkInBookingTest extends TestCase
         $this->assertSame(1, $service->fresh()->stock_qty);
     }
 
-    public function test_neither_customer_nor_guest_is_rejected(): void
+    public function test_neither_customer_nor_guest_is_allowed_for_an_anonymous_walk_in(): void
     {
         $this->loginAsSuperAdmin();
         $service = Service::factory()->create();
 
-        $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+        $response = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
             'items' => [['service_id' => $service->id, 'final_weight_kg' => 1]],
             'fulfillment' => 'pickup',
-        ])->assertUnprocessable()->assertJsonValidationErrors(['customer_id']);
+            'preferred_pickup_at' => now()->toIso8601String(),
+        ]);
+
+        $response->assertCreated();
+
+        $booking = Booking::first();
+        $this->assertNull($booking->customer_id);
+        $this->assertNull($booking->guest_name);
+        $this->assertNull($booking->guest_phone);
     }
 
     public function test_both_customer_and_guest_is_rejected(): void
@@ -224,28 +417,42 @@ class AdminWalkInBookingTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors(['customer_id']);
     }
 
-    public function test_guest_name_without_guest_phone_is_rejected(): void
+    public function test_guest_name_without_guest_phone_is_allowed(): void
     {
         $this->loginAsSuperAdmin();
         $service = Service::factory()->create();
 
-        $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+        $response = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
             'guest_name' => 'Jane Dela Cruz',
             'items' => [['service_id' => $service->id, 'final_weight_kg' => 1]],
             'fulfillment' => 'pickup',
-        ])->assertUnprocessable()->assertJsonValidationErrors(['guest_phone']);
+            'preferred_pickup_at' => now()->toIso8601String(),
+        ]);
+
+        $response->assertCreated();
+
+        $booking = Booking::first();
+        $this->assertSame('Jane Dela Cruz', $booking->guest_name);
+        $this->assertNull($booking->guest_phone);
     }
 
-    public function test_guest_phone_without_guest_name_is_rejected(): void
+    public function test_guest_phone_without_guest_name_is_allowed(): void
     {
         $this->loginAsSuperAdmin();
         $service = Service::factory()->create();
 
-        $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
+        $response = $this->postJson('/api/v1/admin/bookings/walk-in-roasting', [
             'guest_phone' => '09171234567',
             'items' => [['service_id' => $service->id, 'final_weight_kg' => 1]],
             'fulfillment' => 'pickup',
-        ])->assertUnprocessable()->assertJsonValidationErrors(['guest_name']);
+            'preferred_pickup_at' => now()->toIso8601String(),
+        ]);
+
+        $response->assertCreated();
+
+        $booking = Booking::first();
+        $this->assertNull($booking->guest_name);
+        $this->assertSame('09171234567', $booking->guest_phone);
     }
 
     public function test_unknown_customer_id_is_rejected(): void

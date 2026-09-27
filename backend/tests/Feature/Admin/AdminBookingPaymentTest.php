@@ -189,6 +189,51 @@ class AdminBookingPaymentTest extends TestCase
         $this->assertSame(1, $booking->payments()->where('status', 'paid')->count());
     }
 
+    public function test_a_partial_downpayment_can_later_be_paid_the_remaining_balance(): void
+    {
+        $this->loginAsSuperAdmin();
+        $booking = $this->bookingWithItemStatus('confirmed', ['total_amount' => 200]);
+        $booking->payments()->create([
+            'type' => 'downpayment',
+            'amount' => 50,
+            'method' => 'cash',
+            'status' => 'paid',
+            'paid_at' => now(),
+        ]);
+
+        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/payments", ['method' => 'cash']);
+
+        $response->assertOk();
+        $this->assertEquals(200.0, (float) $response->json('paid_amount'));
+        $this->assertEquals(0.0, (float) $response->json('balance'));
+
+        $this->assertDatabaseHas('payments', [
+            'booking_id' => $booking->id,
+            'type' => 'balance',
+            'amount' => 150,
+            'status' => 'paid',
+        ]);
+    }
+
+    public function test_a_payment_attempt_after_the_balance_is_already_fully_paid_is_rejected(): void
+    {
+        $this->loginAsSuperAdmin();
+        $booking = $this->bookingWithItemStatus('confirmed', ['total_amount' => 200]);
+        $booking->payments()->create([
+            'type' => 'downpayment',
+            'amount' => 200,
+            'method' => 'cash',
+            'status' => 'paid',
+            'paid_at' => now(),
+        ]);
+
+        $response = $this->postJson("/api/v1/admin/bookings/{$booking->id}/payments", ['method' => 'cash']);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['amount']);
+        $this->assertSame(1, $booking->payments()->where('status', 'paid')->count());
+    }
+
     public function test_admin_without_payments_permission_is_forbidden(): void
     {
         $this->loginAsAdminWithoutPaymentsPermission();

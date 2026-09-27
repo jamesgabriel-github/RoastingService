@@ -108,6 +108,28 @@ class AdminBookingFulfillmentTest extends TestCase
         ]);
     }
 
+    public function test_start_cooking_uses_the_items_own_est_minutes_override_when_set(): void
+    {
+        $this->loginAsSuperAdmin();
+        $booking = $this->booking();
+        $service = Service::factory()->create(['est_minutes' => 30]);
+        $item = BookingItem::factory()->create([
+            'booking_id' => $booking->id,
+            'service_id' => $service->id,
+            'status' => 'confirmed',
+            'est_minutes' => 120,
+        ]);
+
+        $this->postJson("/api/v1/admin/booking-items/{$item->id}/start-cooking")->assertOk();
+
+        $item->refresh();
+        $this->assertEqualsWithDelta(
+            $item->cooking_started_at->addMinutes(120)->timestamp,
+            $item->est_ready_at->timestamp,
+            1
+        );
+    }
+
     public function test_start_cooking_from_a_shop_order_confirmed_also_succeeds(): void
     {
         $this->loginAsSuperAdmin();

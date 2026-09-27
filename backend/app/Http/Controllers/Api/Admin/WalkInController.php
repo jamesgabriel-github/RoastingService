@@ -8,12 +8,14 @@ use App\Http\Requests\Admin\StoreWalkInShopOrderRequest;
 use App\Http\Resources\AdminBookingResource;
 use App\Models\Booking;
 use App\Models\InventoryLog;
+use App\Models\Payment;
 use App\Models\Service;
 use App\Models\User;
-use App\Services\Booking\BookingCodeGenerator;
 use App\Services\Booking\BookingStatusEngine;
+use App\Services\Booking\WalkInCodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -46,7 +48,7 @@ class WalkInController extends Controller
     public function storeRoasting(
         StoreWalkInRoastingRequest $request,
         BookingStatusEngine $statusEngine,
-        BookingCodeGenerator $codeGenerator
+        WalkInCodeGenerator $codeGenerator
     ): AdminBookingResource {
         $booking = DB::transaction(function () use ($request, $statusEngine, $codeGenerator) {
             $items = $request->validated('items');
@@ -69,13 +71,14 @@ class WalkInController extends Controller
                     'final_weight_kg' => $finalWeightKg,
                     'rate' => $rate,
                     'subtotal' => $subtotal,
+                    'est_minutes' => $item['est_minutes'] ?? $service->est_minutes,
                 ];
             }
 
             $now = now();
 
             $booking = Booking::create([
-                'code' => $codeGenerator->next(),
+                'code' => $codeGenerator->next($request->validated('preferred_pickup_at')),
                 'customer_id' => $request->validated('customer_id'),
                 'guest_name' => $request->validated('guest_name'),
                 'guest_phone' => $request->validated('guest_phone'),
@@ -106,6 +109,8 @@ class WalkInController extends Controller
                 $statusEngine->transition($item, 'confirmed', $request->user()->id);
             }
 
+            $this->recordTenderedPayment($request, $booking, $totalAmount, $now);
+
             return $booking;
         });
 
@@ -115,7 +120,7 @@ class WalkInController extends Controller
     public function storeShop(
         StoreWalkInShopOrderRequest $request,
         BookingStatusEngine $statusEngine,
-        BookingCodeGenerator $codeGenerator
+        WalkInCodeGenerator $codeGenerator
     ): AdminBookingResource {
         $booking = DB::transaction(function () use ($request, $statusEngine, $codeGenerator) {
             $items = $request->validated('items');
@@ -156,6 +161,7 @@ class WalkInController extends Controller
                     'qty' => $qty,
                     'rate' => $rate,
                     'subtotal' => $subtotal,
+                    'est_minutes' => $item['est_minutes'] ?? $service->est_minutes,
                     'inventory_change_qty' => -$qty,
                 ];
             }
@@ -167,7 +173,7 @@ class WalkInController extends Controller
             $now = now();
 
             $booking = Booking::create([
-                'code' => $codeGenerator->next(),
+                'code' => $codeGenerator->next($request->validated('preferred_pickup_at')),
                 'customer_id' => $request->validated('customer_id'),
                 'guest_name' => $request->validated('guest_name'),
                 'guest_phone' => $request->validated('guest_phone'),
@@ -187,6 +193,7 @@ class WalkInController extends Controller
                     'qty' => $itemData['qty'],
                     'rate' => $itemData['rate'],
                     'subtotal' => $itemData['subtotal'],
+                    'est_minutes' => $itemData['est_minutes'],
                     'confirmed_at' => $now,
                     'confirmed_by' => $request->user()->id,
                 ]);
@@ -204,9 +211,41 @@ class WalkInController extends Controller
                 $statusEngine->transition($item, 'confirmed', $request->user()->id);
             }
 
+            $this->recordTenderedPayment($request, $booking, $totalAmount, $now);
+
             return $booking;
         });
 
         return new AdminBookingResource($booking->load(BookingController::detailEagerLoads()));
+    }
+
+    private function recordTenderedPayment(
+        StoreWalkInRoastingRequest|StoreWalkInShopOrderRequest $request,
+        Booking $booking,
+        float $totalAmount,
+        Carbon $now
+    ): void {
+        $paidAmount = round((float) ($request->validated('paid_amount') ?? 0), 2);
+
+        if ($paidAmount <= 0) {
+            return;
+        }
+
+        if ($paidAmount > $totalAmount) {
+            throw ValidationException::withMessages([
+                'paid_amount' => 'Amount paid cannot exceed the order total.',
+            ]);
+        }
+
+        Payment::create([
+            'booking_id' => $booking->id,
+            'type' => $paidAmount >= $totalAmount ? 'full' : 'downpayment',
+            'amount' => $paidAmount,
+            'method' => $request->validated('payment_method'),
+            'reference_no' => $request->validated('payment_reference_no'),
+            'status' => 'paid',
+            'paid_at' => $now,
+            'recorded_by' => $request->user()->id,
+        ]);
     }
 }

@@ -19,7 +19,7 @@ class BookingItemController extends Controller
         $booking = $this->transitionItem($request, $statusEngine, $id, 'cooking', 'started', function (BookingItem $item) {
             $item->load('service');
             $item->cooking_started_at = now();
-            $item->est_ready_at = now()->addMinutes($item->service->est_minutes);
+            $item->est_ready_at = now()->addMinutes($item->est_minutes ?? $item->service->est_minutes);
         });
 
         return new AdminBookingResource($booking->load(BookingController::detailEagerLoads()));

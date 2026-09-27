@@ -25,7 +25,7 @@ class BookingPaymentController extends Controller
     public function store(StorePaymentRequest $request, int $id): AdminBookingResource
     {
         $booking = DB::transaction(function () use ($request, $id) {
-            $booking = Booking::with('items')->lockForUpdate()->findOrFail($id);
+            $booking = Booking::with(['items', 'payments'])->lockForUpdate()->findOrFail($id);
 
             $eligible = $booking->items->every(
                 fn (BookingItem $item) => in_array($item->status, self::PAYMENT_ELIGIBLE_STATUSES, true)
@@ -37,7 +37,10 @@ class BookingPaymentController extends Controller
                 ]);
             }
 
-            if ($booking->payments()->where('status', 'paid')->exists()) {
+            $alreadyPaid = (float) $booking->payments->where('status', 'paid')->sum('amount');
+            $remaining = round((float) $booking->total_amount - $alreadyPaid, 2);
+
+            if ($remaining <= 0) {
                 throw ValidationException::withMessages([
                     'amount' => 'This booking is already fully paid.',
                 ]);
@@ -45,8 +48,8 @@ class BookingPaymentController extends Controller
 
             Payment::create([
                 'booking_id' => $booking->id,
-                'type' => 'full',
-                'amount' => $booking->total_amount,
+                'type' => $alreadyPaid > 0 ? 'balance' : 'full',
+                'amount' => $remaining,
                 'method' => $request->validated('method'),
                 'reference_no' => $request->validated('reference_no'),
                 'status' => 'paid',
