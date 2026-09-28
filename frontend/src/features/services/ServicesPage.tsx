@@ -1,9 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { isAxiosError } from 'axios'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { cn } from 'cn'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getGenericErrorMessage } from '@/lib/errors'
@@ -47,6 +57,7 @@ const serviceSchema = z
   })
 
 type ServiceFormValues = z.infer<typeof serviceSchema>
+type ModalMode = 'create' | 'view' | 'edit'
 
 const emptyValues: ServiceFormValues = {
   name: '',
@@ -85,28 +96,58 @@ function toPayload(values: ServiceFormValues): ServicePayload {
   }
 }
 
-function ServiceRow({ service, onEdit }: { service: Service; onEdit: (service: Service) => void }) {
+function typesLabel(service: Service): string {
+  return [
+    service.allow_customer_supplied ? 'Bring your own' : null,
+    service.allow_shop_supplied ? 'Shop stock' : null,
+  ]
+    .filter(Boolean)
+    .join(', ')
+}
+
+function StatusPill({ isActive }: { isActive: boolean }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+        isActive ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+      )}
+    >
+      {isActive ? 'Active' : 'Inactive'}
+    </span>
+  )
+}
+
+function ServiceRow({
+  service,
+  onView,
+  onEdit,
+}: {
+  service: Service
+  onView: (service: Service) => void
+  onEdit: (service: Service) => void
+}) {
   const [rowError, setRowError] = useState<string | null>(null)
   const toggle = useToggleService()
 
   return (
     <tr className="border-b">
       <td className="p-2">{service.name}</td>
-      <td className="p-2">
-        {[
-          service.allow_customer_supplied ? 'Bring your own' : null,
-          service.allow_shop_supplied ? 'Shop stock' : null,
-        ]
-          .filter(Boolean)
-          .join(', ')}
-      </td>
       <td className="p-2">{service.roasting_rate_per_kg ?? '—'}</td>
       <td className="p-2">{service.shop_price ?? '—'}</td>
       <td className="p-2">{service.est_minutes} min</td>
-      <td className="p-2">{service.stock_qty}</td>
-      <td className="p-2">{service.is_active ? 'Active' : 'Inactive'}</td>
+      <td className="p-2">
+        {service.stock_qty}
+        {service.is_low_stock && <span className="ml-1 text-xs text-destructive">Low</span>}
+      </td>
+      <td className="p-2">
+        <StatusPill isActive={service.is_active} />
+      </td>
       <td className="p-2">
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => onView(service)}>
+            View
+          </Button>
           <Button size="sm" variant="outline" onClick={() => onEdit(service)}>
             Edit
           </Button>
@@ -132,8 +173,12 @@ export function ServicesPage() {
   const { data: services, isLoading } = useServices()
   const createService = useCreateService()
   const updateService = useUpdateService()
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [isOpen, setIsOpen] = useState(false)
+  const [mode, setMode] = useState<ModalMode>('create')
+  const [activeService, setActiveService] = useState<Service | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const {
     register,
@@ -150,15 +195,51 @@ export function ServicesPage() {
   const allowCustomerSupplied = watch('allow_customer_supplied')
   const allowShopSupplied = watch('allow_shop_supplied')
   const isSaving = createService.isPending || updateService.isPending
+  const isViewing = mode === 'view'
 
-  const startEdit = (service: Service) => {
-    setEditingId(service.id)
-    setFormError(null)
-    reset(toFormValues(service))
+  const filteredServices = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return services ?? []
+    return (services ?? []).filter(
+      (service) => service.name.toLowerCase().includes(query) || typesLabel(service).toLowerCase().includes(query)
+    )
+  }, [services, search])
+
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message)
+    setTimeout(() => setSuccessMessage(null), 3000)
   }
 
-  const cancelEdit = () => {
-    setEditingId(null)
+  const openCreate = () => {
+    setActiveService(null)
+    setMode('create')
+    setFormError(null)
+    reset(emptyValues)
+    setIsOpen(true)
+  }
+
+  const openView = (service: Service) => {
+    setActiveService(service)
+    setMode('view')
+    setFormError(null)
+    reset(toFormValues(service))
+    setIsOpen(true)
+  }
+
+  const openEdit = (service: Service) => {
+    setActiveService(service)
+    setMode('edit')
+    setFormError(null)
+    reset(toFormValues(service))
+    setIsOpen(true)
+  }
+
+  const switchToEdit = () => setMode('edit')
+
+  const closeModal = () => {
+    setIsOpen(false)
+    setActiveService(null)
+    setMode('create')
     setFormError(null)
     reset(emptyValues)
   }
@@ -178,122 +259,182 @@ export function ServicesPage() {
       setFormError(getGenericErrorMessage(error))
     }
 
-    if (editingId) {
+    if (activeService) {
       updateService.mutate(
-        { id: editingId, payload },
-        { onSuccess: () => cancelEdit(), onError }
+        { id: activeService.id, payload },
+        {
+          onSuccess: () => {
+            closeModal()
+            showSuccess('Service updated.')
+          },
+          onError,
+        }
       )
       return
     }
 
-    createService.mutate(payload, { onSuccess: () => reset(emptyValues), onError })
+    createService.mutate(payload, {
+      onSuccess: () => {
+        closeModal()
+        showSuccess('Service created.')
+      },
+      onError,
+    })
   })
 
   return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="mb-4 text-xl font-semibold">Services</h1>
-        {isLoading && <p>Loading…</p>}
-        {services && (
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="border-b">
-                <th className="p-2">Name</th>
-                <th className="p-2">Types</th>
-                <th className="p-2">Rate/kg</th>
-                <th className="p-2">Price</th>
-                <th className="p-2">Cook time</th>
-                <th className="p-2">Stock</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {services.map((service) => (
-                <ServiceRow key={service.id} service={service} onEdit={startEdit} />
-              ))}
-            </tbody>
-          </table>
-        )}
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Services</h1>
+        <Button onClick={openCreate}>New Service</Button>
       </div>
 
-      <form onSubmit={onSubmit} className="flex max-w-sm flex-col gap-4">
-        <h2 className="font-semibold">{editingId ? 'Edit service' : 'Create service'}</h2>
+      {successMessage && (
+        <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">{successMessage}</div>
+      )}
 
-        {formError && <p className="text-sm text-destructive">{formError}</p>}
+      <Input
+        placeholder="Search services…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="max-w-xs"
+      />
 
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="name">Name</Label>
-          <Input id="name" {...register('name')} />
-          {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-        </div>
+      {isLoading && <p>Loading…</p>}
+      {services && (
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="border-b">
+              <th className="p-2">Name</th>
+              <th className="p-2">Rate/kg</th>
+              <th className="p-2">Price</th>
+              <th className="p-2">Cook time</th>
+              <th className="p-2">Stock</th>
+              <th className="p-2">Status</th>
+              <th className="p-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredServices.map((service) => (
+              <ServiceRow key={service.id} service={service} onView={openView} onEdit={openEdit} />
+            ))}
+          </tbody>
+        </table>
+      )}
 
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="description">Description</Label>
-          <Input id="description" {...register('description')} />
-        </div>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {mode === 'create' ? 'Create Service' : mode === 'view' ? activeService?.name : 'Edit Service'}
+            </DialogTitle>
+            <DialogDescription>
+              {mode === 'view'
+                ? 'Service details'
+                : mode === 'edit'
+                  ? 'Update service details'
+                  : 'Add a new service'}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="est_minutes">Cook time (minutes)</Label>
-          <Input id="est_minutes" type="number" {...register('est_minutes', { valueAsNumber: true })} />
-          {errors.est_minutes && <p className="text-sm text-destructive">{errors.est_minutes.message}</p>}
-        </div>
+          <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            {formError && <p className="text-sm text-destructive">{formError}</p>}
 
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="low_stock_threshold">Low-stock threshold</Label>
-          <Input
-            id="low_stock_threshold"
-            type="number"
-            {...register('low_stock_threshold', { valueAsNumber: true })}
-          />
-          {errors.low_stock_threshold && (
-            <p className="text-sm text-destructive">{errors.low_stock_threshold.message}</p>
-          )}
-        </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" disabled={isViewing} {...register('name')} />
+              {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+            </div>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" {...register('allow_customer_supplied')} />
-          Bring your own (customer-supplied)
-        </label>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="description">Description</Label>
+              <Input id="description" disabled={isViewing} {...register('description')} />
+            </div>
 
-        {allowCustomerSupplied && (
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="roasting_rate_per_kg">Rate per kg</Label>
-            <Input id="roasting_rate_per_kg" {...register('roasting_rate_per_kg')} />
-            {errors.roasting_rate_per_kg && (
-              <p className="text-sm text-destructive">{errors.roasting_rate_per_kg.message}</p>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="est_minutes">Cook time (minutes)</Label>
+              <Input
+                id="est_minutes"
+                type="number"
+                disabled={isViewing}
+                {...register('est_minutes', { valueAsNumber: true })}
+              />
+              {errors.est_minutes && <p className="text-sm text-destructive">{errors.est_minutes.message}</p>}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="low_stock_threshold">Low-stock threshold</Label>
+              <Input
+                id="low_stock_threshold"
+                type="number"
+                disabled={isViewing}
+                {...register('low_stock_threshold', { valueAsNumber: true })}
+              />
+              {errors.low_stock_threshold && (
+                <p className="text-sm text-destructive">{errors.low_stock_threshold.message}</p>
+              )}
+            </div>
+
+            <Label>
+              <input type="checkbox" disabled={isViewing} {...register('allow_customer_supplied')} />
+              Bring your own (customer-supplied)
+            </Label>
+
+            {allowCustomerSupplied && (
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="roasting_rate_per_kg">Rate per kg</Label>
+                <Input id="roasting_rate_per_kg" disabled={isViewing} {...register('roasting_rate_per_kg')} />
+                {errors.roasting_rate_per_kg && (
+                  <p className="text-sm text-destructive">{errors.roasting_rate_per_kg.message}</p>
+                )}
+              </div>
             )}
-          </div>
-        )}
 
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" {...register('allow_shop_supplied')} />
-          Order from shop stock
-        </label>
+            <Label>
+              <input type="checkbox" disabled={isViewing} {...register('allow_shop_supplied')} />
+              Order from shop stock
+            </Label>
 
-        {allowShopSupplied && (
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="shop_price">Shop price</Label>
-            <Input id="shop_price" {...register('shop_price')} />
-            {errors.shop_price && <p className="text-sm text-destructive">{errors.shop_price.message}</p>}
-          </div>
-        )}
+            {allowShopSupplied && (
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="shop_price">Shop price</Label>
+                <Input id="shop_price" disabled={isViewing} {...register('shop_price')} />
+                {errors.shop_price && <p className="text-sm text-destructive">{errors.shop_price.message}</p>}
+              </div>
+            )}
 
-        {errors.allow_shop_supplied && !allowShopSupplied && (
-          <p className="text-sm text-destructive">{errors.allow_shop_supplied.message}</p>
-        )}
+            {errors.allow_shop_supplied && !allowShopSupplied && (
+              <p className="text-sm text-destructive">{errors.allow_shop_supplied.message}</p>
+            )}
 
-        <div className="flex gap-2">
-          <Button type="submit" disabled={isSaving}>
-            {isSaving ? 'Saving…' : editingId ? 'Save changes' : 'Create service'}
-          </Button>
-          {editingId && (
-            <Button type="button" variant="outline" onClick={cancelEdit}>
-              Cancel
-            </Button>
-          )}
-        </div>
-      </form>
+            {mode !== 'create' && activeService && (
+              <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+                <span>Stock: {activeService.stock_qty}</span>
+                <span>{activeService.is_low_stock ? 'Low stock' : 'Stock OK'}</span>
+                <span>Status: {activeService.is_active ? 'Active' : 'Inactive'}</span>
+              </div>
+            )}
+
+            <DialogFooter>
+              {mode === 'view' ? (
+                <>
+                  <DialogClose render={<Button type="button" variant="outline" />}>Close</DialogClose>
+                  <Button type="button" onClick={switchToEdit}>
+                    Switch to Edit
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+                  <Button type="submit" disabled={isSaving}>
+                    {isSaving ? 'Saving…' : mode === 'edit' ? 'Save changes' : 'Create service'}
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
