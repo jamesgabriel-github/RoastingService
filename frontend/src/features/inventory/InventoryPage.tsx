@@ -1,91 +1,33 @@
-import { useState } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
+import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import type { Service } from '@/features/services/types'
 import { getGenericErrorMessage } from '@/lib/errors'
 import { useAdjustService, useInventory, useInventoryLogs, useRestockService } from './hooks'
 
-function InventoryRow({ service }: { service: Service }) {
-  const [qty, setQty] = useState('')
-  const [remarks, setRemarks] = useState('')
-  const [rowError, setRowError] = useState<string | null>(null)
-  const restock = useRestockService()
-  const adjust = useAdjustService()
-  const isSaving = restock.isPending || adjust.isPending
+type ModalMode = 'view' | 'restock' | 'adjust'
 
-  const parsedQty = Number(qty)
-  const canSubmit = qty.trim() !== '' && Number.isInteger(parsedQty) && parsedQty !== 0
-
-  const reset = () => {
-    setQty('')
-    setRemarks('')
-  }
-
-  const onRestock = () => {
-    if (!canSubmit || parsedQty <= 0) {
-      setRowError('Enter a positive quantity to restock.')
-      return
-    }
-    setRowError(null)
-    restock.mutate(
-      { id: service.id, payload: { qty: parsedQty, remarks: remarks.trim() || null } },
-      { onSuccess: reset, onError: (error) => setRowError(getGenericErrorMessage(error)) }
-    )
-  }
-
-  const onAdjust = () => {
-    if (!canSubmit) {
-      setRowError('Enter a non-zero quantity to adjust (use a negative number to reduce stock).')
-      return
-    }
-    setRowError(null)
-    adjust.mutate(
-      { id: service.id, payload: { change_qty: parsedQty, remarks: remarks.trim() || null } },
-      { onSuccess: reset, onError: (error) => setRowError(getGenericErrorMessage(error)) }
-    )
-  }
-
+function StatusPill({ isLowStock }: { isLowStock: boolean }) {
   return (
-    <tr className="border-b align-top">
-      <td className="p-2">{service.name}</td>
-      <td className="p-2">{service.stock_qty}</td>
-      <td className="p-2">
-        {service.is_low_stock ? (
-          <span className="rounded bg-destructive/10 px-2 py-1 text-sm text-destructive">Low stock</span>
-        ) : (
-          '—'
-        )}
-      </td>
-      <td className="p-2">{service.low_stock_threshold}</td>
-      <td className="p-2">
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
-            <Input
-              className="w-24"
-              type="number"
-              placeholder="Qty"
-              value={qty}
-              onChange={(event) => setQty(event.target.value)}
-            />
-            <Input
-              className="w-40"
-              placeholder="Remarks (optional)"
-              value={remarks}
-              onChange={(event) => setRemarks(event.target.value)}
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" disabled={isSaving} onClick={onRestock}>
-              Restock
-            </Button>
-            <Button size="sm" variant="outline" disabled={isSaving} onClick={onAdjust}>
-              Adjust
-            </Button>
-          </div>
-          {rowError && <p className="text-sm text-destructive">{rowError}</p>}
-        </div>
-      </td>
-    </tr>
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+        isLowStock ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'
+      )}
+    >
+      {isLowStock ? 'Low stock' : 'In stock'}
+    </span>
   )
 }
 
@@ -152,11 +94,136 @@ function InventoryLogTable() {
 
 export function InventoryPage() {
   const { data: services, isLoading } = useInventory()
+  const restock = useRestockService()
+  const adjust = useAdjustService()
+
+  const [isOpen, setIsOpen] = useState(false)
+  const [mode, setMode] = useState<ModalMode>('view')
+  const [activeService, setActiveService] = useState<Service | null>(null)
+  const [qty, setQty] = useState('')
+  const [remarks, setRemarks] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  const isSaving = restock.isPending || adjust.isPending
+
+  const filteredServices = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return services ?? []
+    return (services ?? []).filter((service) => service.name.toLowerCase().includes(query))
+  }, [services, search])
+
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message)
+    setTimeout(() => setSuccessMessage(null), 3000)
+  }
+
+  const resetForm = () => {
+    setQty('')
+    setRemarks('')
+    setFormError(null)
+  }
+
+  const openView = (service: Service) => {
+    setActiveService(service)
+    setMode('view')
+    resetForm()
+    setIsOpen(true)
+  }
+
+  const openRestock = (service: Service) => {
+    setActiveService(service)
+    setMode('restock')
+    resetForm()
+    setIsOpen(true)
+  }
+
+  const openAdjust = (service: Service) => {
+    setActiveService(service)
+    setMode('adjust')
+    resetForm()
+    setIsOpen(true)
+  }
+
+  const switchToRestock = () => {
+    resetForm()
+    setMode('restock')
+  }
+
+  const switchToAdjust = () => {
+    resetForm()
+    setMode('adjust')
+  }
+
+  const closeModal = () => {
+    setIsOpen(false)
+    setActiveService(null)
+    setMode('view')
+    resetForm()
+  }
+
+  const parsedQty = Number(qty)
+  const isValidQty = qty.trim() !== '' && Number.isInteger(parsedQty) && parsedQty !== 0
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!activeService) return
+
+    if (mode === 'restock') {
+      if (!isValidQty || parsedQty <= 0) {
+        setFormError('Enter a positive quantity to restock.')
+        return
+      }
+      setFormError(null)
+      restock.mutate(
+        { id: activeService.id, payload: { qty: parsedQty, remarks: remarks.trim() || null } },
+        {
+          onSuccess: () => {
+            closeModal()
+            showSuccess('Service restocked.')
+          },
+          onError: (error) => setFormError(getGenericErrorMessage(error)),
+        }
+      )
+      return
+    }
+
+    if (mode === 'adjust') {
+      if (!isValidQty) {
+        setFormError('Enter a non-zero quantity to adjust (use a negative number to reduce stock).')
+        return
+      }
+      setFormError(null)
+      adjust.mutate(
+        { id: activeService.id, payload: { change_qty: parsedQty, remarks: remarks.trim() || null } },
+        {
+          onSuccess: () => {
+            closeModal()
+            showSuccess('Stock adjusted.')
+          },
+          onError: (error) => setFormError(getGenericErrorMessage(error)),
+        }
+      )
+    }
+  }
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="mb-4 text-xl font-semibold">Inventory</h1>
+      <div className="flex flex-col gap-4">
+        <h1 className="text-xl font-semibold">Inventory</h1>
+
+        {successMessage && (
+          <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">{successMessage}</div>
+        )}
+
+        <Input
+          placeholder="Search inventory…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          className="max-w-xs"
+        />
+
         {isLoading && <p>Loading…</p>}
         {services && (
           <table className="w-full border-collapse text-left">
@@ -166,17 +233,104 @@ export function InventoryPage() {
                 <th className="p-2">Stock</th>
                 <th className="p-2">Status</th>
                 <th className="p-2">Threshold</th>
-                <th className="p-2">Restock / adjust</th>
+                <th className="p-2">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {services.map((service) => (
-                <InventoryRow key={service.id} service={service} />
+              {filteredServices.map((service) => (
+                <tr key={service.id} className="border-b">
+                  <td className="p-2">{service.name}</td>
+                  <td className="p-2">{service.stock_qty}</td>
+                  <td className="p-2">
+                    <StatusPill isLowStock={service.is_low_stock} />
+                  </td>
+                  <td className="p-2">{service.low_stock_threshold}</td>
+                  <td className="p-2">
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => openView(service)}>
+                        View
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => openRestock(service)}>
+                        Restock
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => openAdjust(service)}>
+                        Adjust
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+
+      <Dialog open={isOpen} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {mode === 'view' ? activeService?.name : mode === 'restock' ? 'Restock service' : 'Adjust stock'}
+            </DialogTitle>
+            <DialogDescription>
+              {mode === 'view'
+                ? 'Inventory details'
+                : mode === 'restock'
+                  ? 'Add stock for this service'
+                  : 'Correct the stock count for this service'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {mode === 'view' && activeService && (
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+                <span>Stock: {activeService.stock_qty}</span>
+                <span>
+                  <StatusPill isLowStock={activeService.is_low_stock} />
+                </span>
+                <span>Threshold: {activeService.low_stock_threshold}</span>
+              </div>
+              <DialogFooter>
+                <DialogClose render={<Button type="button" variant="outline" />}>Close</DialogClose>
+                <Button type="button" variant="outline" onClick={switchToRestock}>
+                  Switch to Restock
+                </Button>
+                <Button type="button" onClick={switchToAdjust}>
+                  Switch to Adjust
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {(mode === 'restock' || mode === 'adjust') && (
+            <form onSubmit={onSubmit} className="flex flex-col gap-4">
+              {formError && <p className="text-sm text-destructive">{formError}</p>}
+
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="qty">{mode === 'restock' ? 'Quantity to add' : 'Change in quantity'}</Label>
+                <Input
+                  id="qty"
+                  type="number"
+                  value={qty}
+                  onChange={(event) => setQty(event.target.value)}
+                  placeholder={mode === 'restock' ? 'e.g. 10' : 'e.g. -3'}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="remarks">Remarks (optional)</Label>
+                <Input id="remarks" value={remarks} onChange={(event) => setRemarks(event.target.value)} />
+              </div>
+
+              <DialogFooter>
+                <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving ? 'Saving…' : mode === 'restock' ? 'Confirm restock' : 'Save adjustment'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <InventoryLogTable />
     </div>
