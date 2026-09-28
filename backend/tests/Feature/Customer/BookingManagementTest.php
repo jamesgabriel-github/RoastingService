@@ -42,7 +42,7 @@ class BookingManagementTest extends TestCase
             'estimated_total' => '600.00',
         ]);
         $code = $response->json('code');
-        $this->assertMatchesRegularExpression('/^RS-\d{4}$/', $code);
+        $this->assertMatchesRegularExpression('/^RS-\d{6}-\d{3}$/', $code);
 
         $this->assertDatabaseHas('bookings', [
             'code' => $code,

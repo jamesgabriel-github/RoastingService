@@ -213,7 +213,7 @@ class AdminWalkInBookingTest extends TestCase
         $response->assertJsonPath('items.0.est_minutes', 150);
     }
 
-    public function test_walk_in_booking_code_follows_the_wb_format_and_increments_per_date(): void
+    public function test_walk_in_booking_code_follows_the_shared_rs_format_and_increments_per_date(): void
     {
         $this->loginAsSuperAdmin();
         $service = Service::factory()->create(['roasting_rate_per_kg' => 150]);
@@ -242,9 +242,9 @@ class AdminWalkInBookingTest extends TestCase
         ]);
 
         $expectedDate = $pickupAt->format('ymd');
-        $first->assertJsonPath('code', "WB-{$expectedDate}-001");
-        $second->assertJsonPath('code', "WB-{$expectedDate}-002");
-        $otherDate->assertJsonPath('code', 'WB-'.$pickupAt->clone()->addDay()->format('ymd').'-001');
+        $first->assertJsonPath('code', "RS-{$expectedDate}-001");
+        $second->assertJsonPath('code', "RS-{$expectedDate}-002");
+        $otherDate->assertJsonPath('code', 'RS-'.$pickupAt->clone()->addDay()->format('ymd').'-001');
     }
 
     public function test_paid_amount_below_total_creates_a_downpayment_payment(): void

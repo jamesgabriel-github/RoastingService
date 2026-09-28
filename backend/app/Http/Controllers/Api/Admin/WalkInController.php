@@ -11,8 +11,8 @@ use App\Models\InventoryLog;
 use App\Models\Payment;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\Booking\BookingCodeGenerator;
 use App\Services\Booking\BookingStatusEngine;
-use App\Services\Booking\WalkInCodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -48,7 +48,7 @@ class WalkInController extends Controller
     public function storeRoasting(
         StoreWalkInRoastingRequest $request,
         BookingStatusEngine $statusEngine,
-        WalkInCodeGenerator $codeGenerator
+        BookingCodeGenerator $codeGenerator
     ): AdminBookingResource {
         $booking = DB::transaction(function () use ($request, $statusEngine, $codeGenerator) {
             $items = $request->validated('items');
@@ -120,7 +120,7 @@ class WalkInController extends Controller
     public function storeShop(
         StoreWalkInShopOrderRequest $request,
         BookingStatusEngine $statusEngine,
-        WalkInCodeGenerator $codeGenerator
+        BookingCodeGenerator $codeGenerator
     ): AdminBookingResource {
         $booking = DB::transaction(function () use ($request, $statusEngine, $codeGenerator) {
             $items = $request->validated('items');

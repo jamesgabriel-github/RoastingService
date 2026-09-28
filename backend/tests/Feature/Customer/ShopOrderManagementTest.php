@@ -41,7 +41,7 @@ class ShopOrderManagementTest extends TestCase
             'estimated_total' => '0.00',
         ]);
         $code = $response->json('code');
-        $this->assertMatchesRegularExpression('/^RS-\d{4}$/', $code);
+        $this->assertMatchesRegularExpression('/^RS-\d{6}-\d{3}$/', $code);
 
         $this->assertDatabaseHas('bookings', [
             'code' => $code,

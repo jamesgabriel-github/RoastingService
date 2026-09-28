@@ -69,7 +69,7 @@ class OrderController extends Controller
             }
 
             $booking = Booking::create([
-                'code' => $codeGenerator->next(),
+                'code' => $codeGenerator->next($request->validated('preferred_pickup_at')),
                 'customer_id' => $customerId,
                 'is_order' => true,
                 'fulfillment' => $request->validated('fulfillment'),
