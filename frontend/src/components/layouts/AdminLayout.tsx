@@ -20,8 +20,8 @@ export function AdminLayout() {
     location.pathname === '/admin/bookings' ? parseQueueGroup(new URLSearchParams(location.search).get('group')) : null
 
   return (
-    <div className="flex min-h-svh">
-      <aside className="flex w-56 shrink-0 flex-col border-r p-4">
+    <div className="flex h-svh overflow-hidden">
+      <aside className="flex w-56 shrink-0 flex-col overflow-y-auto border-r p-4">
         <NavLink to="/admin" className="mb-6 block font-semibold" end>
           Admin
         </NavLink>
@@ -85,7 +85,7 @@ export function AdminLayout() {
         </Button>
       </aside>
 
-      <main className="flex-1 p-4">
+      <main className="flex-1 overflow-y-auto p-4">
         <Outlet />
       </main>
     </div>
