@@ -37,7 +37,6 @@ function InventoryLogTable() {
 
   return (
     <div>
-      <h2 className="mb-4 font-semibold">Inventory log</h2>
       {isLoading && <p>Loading…</p>}
       {data && (
         <>
@@ -98,6 +97,7 @@ export function InventoryPage() {
   const adjust = useAdjustService()
 
   const [isOpen, setIsOpen] = useState(false)
+  const [isLogOpen, setIsLogOpen] = useState(false)
   const [mode, setMode] = useState<ModalMode>('view')
   const [activeService, setActiveService] = useState<Service | null>(null)
   const [qty, setQty] = useState('')
@@ -217,12 +217,17 @@ export function InventoryPage() {
           <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">{successMessage}</div>
         )}
 
-        <Input
-          placeholder="Search inventory…"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="max-w-xs"
-        />
+        <div className="flex items-center justify-between gap-2">
+          <Input
+            placeholder="Search inventory…"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="max-w-xs"
+          />
+          <Button type="button" variant="outline" onClick={() => setIsLogOpen(true)}>
+            Inventory Log
+          </Button>
+        </div>
 
         {isLoading && <p>Loading…</p>}
         {services && (
@@ -332,7 +337,21 @@ export function InventoryPage() {
         </DialogContent>
       </Dialog>
 
-      <InventoryLogTable />
+      <Dialog open={isLogOpen} onOpenChange={setIsLogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Inventory log</DialogTitle>
+          </DialogHeader>
+          {isLogOpen && (
+            <div className="overflow-x-auto">
+              <InventoryLogTable />
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" />}>Close</DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
